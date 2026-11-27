@@ -1,0 +1,1616 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MQTT Viewer · ดูค่าจากอุปกรณ์</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" id="tc" content="#060a12">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MQTT Viewer">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600&family=Sarabun:wght@400;600&family=Chakra+Petch:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#edf2f5;--card:#fff;--ink:#14303c;--mute:#566f7d;--line:#d9e4ea;--grid:#e6eef2;--acc:#0f7f95;
+  --ok:#157a49;--okbg:#e0f4e9;--warn:#9a5a00;--warnbg:#fdeed2;--bad:#b4311f;--badbg:#fbe3df;
+  font-family:Sarabun,"Noto Sans Thai",system-ui,sans-serif;color-scheme:light}
+:root[data-theme=dark]{--bg:#0a141a;--card:#122029;--ink:#e6f3f7;--mute:#8fabb7;--line:#223a46;--grid:#1b2f39;--acc:#35d0e8;
+  --ok:#52e394;--okbg:#103222;--warn:#ffbd57;--warnbg:#36290c;--bad:#ff8672;--badbg:#3b1812;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+header.bar{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+header .wrap{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding-top:10px;padding-bottom:10px}
+.brand{margin-right:auto}
+h1{font:600 20px Prompt,Sarabun,sans-serif;margin:0}
+.brand p{margin:0;color:var(--mute);font-size:13px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tools label{color:var(--mute);font-size:14px}
+input,select,button{font:inherit;font-size:15px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+input{width:200px}
+button{cursor:pointer;font-weight:600}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+:root[data-theme=dark] button.pri{color:#04222a}
+button:disabled{opacity:.55;cursor:wait}
+[hidden]{display:none!important}
+
+.banner{margin:16px 0 8px;padding:14px 18px;border-radius:14px;display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;background:var(--okbg);color:var(--ok);border:1px solid color-mix(in srgb,currentColor 25%,transparent)}
+.banner.warn{background:var(--warnbg);color:var(--warn)}
+.banner.bad{background:var(--badbg);color:var(--bad)}
+.banner b{font:600 18px Prompt,Sarabun,sans-serif;display:flex;align-items:center;gap:10px}
+.banner i{width:12px;height:12px;border-radius:50%;background:currentColor;flex:none}
+.banner.ok i{animation:pulse 2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 7px transparent;opacity:.55}0%{box-shadow:0 0 0 0 currentColor}}
+@media(prefers-reduced-motion:reduce){.banner.ok i{animation:none}}
+.banner span{color:var(--ink);font-size:15px}
+
+details.help{margin:0 0 18px;color:var(--mute);font-size:15px}
+details.help summary{cursor:pointer;color:var(--acc);font-weight:600;width:fit-content}
+details.help ul{margin:8px 0 0;padding-left:22px}
+details.help li{margin:3px 0}
+
+.grp{margin-bottom:28px}
+.gh{display:flex;align-items:baseline;gap:10px;margin:0 0 12px;font:600 18px Prompt,Sarabun,sans-serif}
+.gh span{overflow-wrap:anywhere}
+.gh small{font:400 14px Sarabun,sans-serif;color:var(--mute)}
+.gg{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,350px),1fr));gap:16px}
+
+.card{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.head{display:flex;gap:12px;align-items:flex-start}
+.ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:22px;flex:none;background:color-mix(in srgb,var(--c) 16%,transparent)}
+.tt{min-width:0;flex:1}
+h2{font:600 17px Prompt,Sarabun,sans-serif;margin:0;overflow-wrap:anywhere;line-height:1.3}
+.sub{color:var(--mute);font-size:12px;overflow-wrap:anywhere}
+.age{font-size:12px;font-weight:600;white-space:nowrap;padding:3px 9px;border-radius:99px;background:var(--okbg);color:var(--ok)}
+.age.old{background:var(--warnbg);color:var(--warn)}
+.age:empty{display:none}
+.vr{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px}
+.val{font:600 44px/1.1 Prompt,Sarabun,sans-serif;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.val.text{font:400 17px/1.4 Sarabun,sans-serif;white-space:pre-wrap}
+.unit{font:500 18px Prompt,Sarabun,sans-serif;color:var(--mute)}
+.tr{font-size:14px;font-weight:600;color:var(--mute);margin-left:auto}
+.tr.up{color:var(--ok)}.tr.dn{color:var(--bad)}
+.hint{margin:0;font-size:14px;color:var(--mute)}
+.hint:empty{display:none}
+canvas{width:100%;height:172px;display:block;touch-action:pan-y;margin-top:4px}
+.stl{font-size:13px;color:var(--mute);border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.st{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0}
+.st div{min-width:0}
+.st dt{color:var(--mute);font-size:12px}
+.st dd{margin:0;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.empty{text-align:center;color:var(--mute);padding:70px 10px;font-size:17px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:10px;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+
+.sb{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;align-self:center}
+.sb.ok{background:var(--okbg);color:var(--ok)}.sb.warn{background:var(--warnbg);color:var(--warn)}.sb:empty{display:none}
+.card{cursor:pointer;transition:transform .15s,border-color .15s}
+.card:hover{transform:translateY(-3px);border-color:var(--c)}
+.card.flash{animation:fl .9s}
+@keyframes fl{from{box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 45%,transparent)}to{box-shadow:0 0 0 0 transparent}}
+.hg{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:26px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;text-align:center;cursor:pointer;transition:transform .15s,border-color .15s,opacity .3s}
+.tile:hover{transform:translateY(-3px);border-color:var(--c)}
+.tile.stale{opacity:.55}
+.tl{font:600 15px Prompt,Sarabun,sans-serif}
+.tile small{display:block;color:var(--mute);font:400 12px Sarabun,sans-serif;overflow-wrap:anywhere}
+svg.gs{width:100%;max-width:190px;height:auto;margin:6px auto 0;display:block}
+.tk,.zn,.fl{fill:none;stroke-width:10;stroke-linecap:round}
+.tk{stroke:var(--grid)}.zn{stroke:var(--ok);opacity:.3}
+.fl{stroke:var(--c);stroke-dasharray:157.08;stroke-dashoffset:157.08;transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1),stroke .3s}
+.tile[data-s=ok] .fl{stroke:var(--ok)}.tile[data-s=warn] .fl{stroke:var(--warn)}
+.tv{font:600 28px Prompt,Sarabun,sans-serif;margin-top:-34px;position:relative;font-variant-numeric:tabular-nums}
+.tv span{font-size:14px;color:var(--mute);margin-left:4px}
+.tt2{margin-top:6px;font-size:13px;font-weight:600;color:var(--mute)}
+.tt2.ok{color:var(--ok)}.tt2.warn{color:var(--warn)}
+.tile .hint{font-size:12px;margin-top:2px}
+dialog{width:min(94vw,820px);border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--ink);padding:20px 22px}
+dialog::backdrop{background:rgba(5,15,20,.55);backdrop-filter:blur(3px)}
+dialog[open]{animation:pop .2s}
+@keyframes pop{from{opacity:0;transform:scale(.96)}}
+.dh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:6px}
+.dh h2{font-size:22px}
+#dcv{height:340px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.ck{display:none;width:26px;height:26px;border-radius:8px;border:2px solid var(--line);flex:none;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;background:var(--card)}
+body.sel .ck{display:flex}
+.on .ck{background:var(--acc);border-color:var(--acc)}.on .ck::after{content:"✓"}
+body.sel .card,body.sel .tile{cursor:copy}
+.card.on,.tile.on{outline:3px solid var(--acc);outline-offset:-1px}
+.tile{position:relative}.tile .ck{position:absolute;top:10px;right:10px}
+.da{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+#selbar{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:8;display:none;gap:8px 10px;align-items:center;flex-wrap:wrap;justify-content:center;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px 14px;max-width:94vw;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+body.sel #selbar{display:flex}
+#selt{font-weight:600}
+body.sel main{padding-bottom:110px}body.sel .toast{bottom:96px}
+.dbrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;color:var(--mute);font-size:14px}
+#dtab{max-height:220px;overflow:auto;margin-top:10px;border-top:1px solid var(--line)}
+#dtab table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+#dtab th,#dtab td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line)}
+#dtab th:first-child,#dtab td:first-child{text-align:left}
+#dtab th{position:sticky;top:0;background:var(--card);color:var(--mute);font-weight:600}
+#ldlg{width:min(96vw,1000px)}
+.note{background:var(--warnbg);color:var(--warn);border-radius:12px;padding:12px 14px;margin:8px 0;font-size:15px}
+.ltw{overflow:auto;margin-top:8px}.lbody{max-height:58vh}
+.lt{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.lt th,.lt td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.lt th:first-child,.lt td:first-child{text-align:left;white-space:normal;min-width:190px}
+.lt th{position:sticky;top:0;background:var(--card);color:var(--mute);font-weight:600}
+.lt small{display:block;color:var(--mute);font-size:12px;overflow-wrap:anywhere}
+.acs{display:flex;gap:6px;justify-content:flex-end}.acs button,.acs a{padding:5px 10px;font-size:14px}
+a.btn{font:inherit;font-weight:600;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;text-decoration:none}
+button.danger{color:var(--bad);border-color:var(--bad)}
+#lmsg{font-weight:600;color:var(--ink)}
+.chk{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.chk input{width:auto;margin:0;padding:0}
+#htab{max-height:260px;overflow:auto;margin-top:10px;border-top:1px solid var(--line)}
+#htab table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+#htab th,#htab td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--line)}
+#htab th:first-child,#htab td:first-child{text-align:left}
+#htab th{position:sticky;top:0;background:var(--card);color:var(--mute);font-weight:600}
+#hcv{height:300px}
+#hk{min-width:0;max-width:100%;flex:1 1 240px}
+#ccv{height:300px}#ccb{height:260px}#scv{height:320px}
+.cbh{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:14px 0 2px}.cbh .wt{margin:0;margin-right:auto;font-weight:600;color:var(--ink);font-size:15px}.cbh select{padding:5px 10px;font-size:14px}
+.cleg{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:14px;margin:6px 0}
+.cleg i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+#crate{width:96px}
+#ctab{max-height:300px;overflow:auto;margin-top:10px;border-top:1px solid var(--line)}
+#ctab table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+#ctab th,#ctab td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+#ctab th:first-child,#ctab td:first-child{text-align:left}
+#ctab th{position:sticky;top:0;background:var(--card);color:var(--mute);font-weight:600}
+#wcv{height:240px}#wcb{height:190px}
+.whero{display:flex;gap:6px 32px;flex-wrap:wrap;align-items:baseline;margin:8px 0;padding:12px 16px;border:1px solid var(--line);border-radius:14px}
+.whero div{min-width:0}.whero small{display:block;color:var(--mute);font-size:13px}
+.whero b{font:600 34px/1.15 Prompt,Sarabun,sans-serif;font-variant-numeric:tabular-nums}.whero b span{font-size:16px;font-weight:400;color:var(--mute);margin-left:4px}
+#wrate{width:96px}#wtab{max-height:300px;overflow:auto;margin-top:10px;border-top:1px solid var(--line)}
+#wtab table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+#wtab th,#wtab td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+#wtab th:first-child,#wtab td:first-child{text-align:left}
+#wtab th{position:sticky;top:0;background:var(--card);color:var(--mute);font-weight:600}
+#wtab h3{font-size:15px;margin:14px 0 6px}
+#wtab tr.sum td{font-weight:600;background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.wt{font-size:13px;color:var(--mute);margin:10px 0 2px}
+#ctab h3{font-size:15px;margin:14px 0 6px}
+#ctab tr.sum td{font-weight:600;background:color-mix(in srgb,var(--acc) 9%,transparent)}
+
+/* ===== ธีมนีออน (Control-room) ===== */
+:root{--r:18px;--glass:rgba(255,255,255,.88)}
+:root[data-theme=dark]{--bg:#060a12;--card:#0d1522;--ink:#e8f6ff;--mute:#8aa3b8;--line:#1b2b3f;--grid:#18283d;--acc:#22e1ff;
+  --ok:#3dffa0;--okbg:rgba(61,255,160,.12);--warn:#ffc24b;--warnbg:rgba(255,194,75,.12);--bad:#ff6b8a;--badbg:rgba(255,107,138,.13);
+  --glass:rgba(10,17,29,.78);scrollbar-color:#27405c transparent}
+:root[data-theme=dark] body{background:
+  linear-gradient(rgba(34,225,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(34,225,255,.035) 1px,transparent 1px),
+  radial-gradient(900px 520px at 6% -6%,rgba(34,225,255,.15),transparent 62%),radial-gradient(820px 520px at 100% 0,rgba(168,85,247,.14),transparent 62%),var(--bg);
+  background-size:44px 44px,44px 44px,auto,auto,auto;background-attachment:fixed}
+header.bar{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+:root[data-theme=dark] header.bar{border-bottom-color:color-mix(in srgb,var(--acc) 30%,var(--line));box-shadow:0 10px 34px -16px color-mix(in srgb,var(--acc) 55%,transparent)}
+h1,.val,.tv,.tl{font-family:'Chakra Petch',Prompt,Sarabun,sans-serif}
+h1{font-size:22px;letter-spacing:.02em}
+:root[data-theme=dark] h1{color:#fff;text-shadow:0 0 6px var(--acc),0 0 22px color-mix(in srgb,var(--acc) 70%,transparent)}
+input,select,button{transition:border-color .15s,box-shadow .15s,transform .15s}
+input:focus,select:focus{border-color:var(--acc);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 25%,transparent)}
+button:hover:not(:disabled),a.btn:hover{border-color:var(--acc);box-shadow:0 0 16px -3px color-mix(in srgb,var(--acc) 60%,transparent)}
+button:active:not(:disabled){transform:translateY(1px)}
+button.pri,:root[data-theme=dark] button.pri{background:linear-gradient(135deg,#0e7490,#6d28d9);border-color:transparent;color:#fff}
+:root[data-theme=dark] button.pri{box-shadow:0 0 18px -4px #22e1ff,0 0 26px -8px #a855f7}
+
+.banner{border-radius:var(--r);box-shadow:0 0 28px -14px currentColor}
+.banner i{box-shadow:0 0 10px currentColor}
+:root[data-theme=dark] .banner b{text-shadow:0 0 12px color-mix(in srgb,currentColor 65%,transparent)}
+.gh{position:relative;padding-left:14px}
+.gh::before{content:"";position:absolute;left:0;top:.18em;bottom:.18em;width:4px;border-radius:4px;background:var(--acc)}
+:root[data-theme=dark] .gh::before{box-shadow:0 0 12px var(--acc)}
+
+.card,.tile{position:relative;border-radius:var(--r);border:1px solid color-mix(in srgb,var(--c) 24%,var(--line));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--c) 8%,var(--card)),var(--card) 58%);box-shadow:0 12px 30px -20px rgba(0,0,0,.45)}
+.card::before,.tile::before{content:"";position:absolute;left:18px;right:18px;top:-1px;height:2px;border-radius:0 0 4px 4px;background:var(--c)}
+:root[data-theme=dark] .card::before,:root[data-theme=dark] .tile::before{box-shadow:0 0 14px 1px var(--c)}
+.card:hover,.tile:hover{border-color:var(--c)}
+:root[data-theme=dark] .card:hover,:root[data-theme=dark] .tile:hover{box-shadow:0 0 30px -8px var(--c)}
+.card.on,.tile.on{outline-offset:-3px}
+.ic{box-shadow:0 0 18px -6px var(--c);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.val{font-size:42px;font-weight:600;letter-spacing:.01em}
+.tv{font-size:28px;font-weight:600}
+
+/* ตัวเลขนีออน (โหมดมืด) */
+:root[data-theme=dark] .val,:root[data-theme=dark] .tv,:root[data-theme=dark] #dv{
+  color:color-mix(in srgb,var(--c,var(--acc)) 45%,#fff);
+  text-shadow:0 0 4px color-mix(in srgb,var(--c,var(--acc)) 90%,transparent),0 0 14px var(--c,var(--acc)),0 0 34px color-mix(in srgb,var(--c,var(--acc)) 65%,transparent)}
+:root[data-theme=dark] .val.text{color:var(--ink);text-shadow:none}
+:root[data-theme=dark] .tv span,:root[data-theme=dark] .unit{color:var(--mute);text-shadow:none}
+:root[data-theme=dark] .tr.up,:root[data-theme=dark] .tr.dn{text-shadow:0 0 10px currentColor}
+:root[data-theme=dark] .age:not(.old){text-shadow:0 0 8px color-mix(in srgb,var(--ok) 70%,transparent)}
+:root[data-theme=dark] .fl{filter:drop-shadow(0 0 5px var(--c))}
+:root[data-theme=dark] .tile[data-s=ok] .fl{filter:drop-shadow(0 0 6px var(--ok))}
+:root[data-theme=dark] .tile[data-s=warn] .fl{filter:drop-shadow(0 0 6px var(--warn))}
+:root[data-theme=dark] .zn{opacity:.4}
+#dv{font:600 46px/1.1 'Chakra Petch',Prompt,sans-serif}
+svg.gs{overflow:visible}
+
+dialog{border-radius:22px}
+:root[data-theme=dark] dialog{border-color:color-mix(in srgb,var(--acc) 38%,var(--line));
+  box-shadow:0 0 70px -18px color-mix(in srgb,var(--c,var(--acc)) 55%,transparent),0 30px 80px rgba(0,0,0,.55)}
+#selbar{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+:root[data-theme=dark] .toast{background:#0d1522;color:var(--ink);border:1px solid var(--acc);box-shadow:0 0 22px -4px var(--acc)}
+
+/* ===== มุมมอง (การ์ด/กระชับ/ตาราง) · ปักหมุด · ซ่อน ===== */
+.seg{display:inline-flex}
+.seg button{border-radius:0;margin-left:-1px;padding:8px 11px}
+.seg button:first-child{border-radius:10px 0 0 10px;margin-left:0}
+.seg button:last-child{border-radius:0 10px 10px 0}
+.seg button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff;position:relative}
+:root[data-theme=dark] .seg button[aria-pressed=true]{color:#04222a}
+#shh[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
+.acts{display:inline-flex;gap:2px;flex:none}
+.ib{padding:3px 6px;font-size:15px;line-height:1;border-color:transparent;background:transparent;opacity:.45;border-radius:8px}
+.ib:hover,.ib:focus-visible,.ib[aria-pressed=true]{opacity:1}
+.ib[aria-pressed=true]{background:color-mix(in srgb,var(--acc) 18%,transparent)}
+body.sel .acts{display:none}
+.card.dim,.rw.dim{opacity:.55}
+.grp.pin .gh::before{background:var(--warn);box-shadow:none}
+body[data-view=compact] .gg{grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:10px}
+body[data-view=compact] .card{padding:11px 13px;gap:4px;border-radius:14px}
+body[data-view=compact] .card:hover{transform:none}
+body[data-view=compact] .card .head{gap:8px}
+body[data-view=compact] .card .ic{width:32px;height:32px;font-size:17px;border-radius:10px}
+body[data-view=compact] .card h2{font-size:15px}
+body[data-view=compact] .card .val:not(.text){font-size:28px}
+body[data-view=compact] .card .age{font-size:11px;padding:2px 7px}
+body[data-view=compact] .card .sub,body[data-view=compact] .card .hint,body[data-view=compact] .card .stl,body[data-view=compact] .card .st{display:none}
+body[data-view=compact] .card canvas{height:46px;margin-top:0}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--card);margin-bottom:28px}
+.tbl{width:100%;border-collapse:collapse;min-width:520px}
+.tbl th{text-align:left;font-size:13px;font-weight:600;color:var(--mute);padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .gr th{background:color-mix(in srgb,var(--acc) 9%,transparent);color:var(--ink);font:600 15px Prompt,Sarabun,sans-serif;padding:9px 14px;overflow-wrap:anywhere}
+.tbl .em td{text-align:center;color:var(--mute);padding:26px}
+.tbl .rw[role=button]{cursor:pointer}
+.tbl .rw:hover td{background:color-mix(in srgb,var(--c,var(--acc)) 8%,transparent)}
+.tbl .nc{display:flex;gap:10px;align-items:center;min-width:0}
+.tbl .ic{width:32px;height:32px;font-size:17px;border-radius:10px}
+.tbl .nm{min-width:0}.tbl .nm b{display:block;font-weight:600}
+.tbl .nm small{display:block;color:var(--mute);font-size:12px;overflow-wrap:anywhere}
+.tbl .v{font:600 20px 'Chakra Petch',Prompt,Sarabun,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl .v.txt{font:400 14px Sarabun,sans-serif;white-space:normal;max-width:260px;overflow-wrap:anywhere}
+.tbl .t{font-size:14px;font-weight:600;color:var(--mute);white-space:nowrap}
+.tbl .t.up{color:var(--ok)}.tbl .t.dn{color:var(--bad)}
+.tbl .x{text-align:right;white-space:nowrap}
+.tbl .rw.on td{background:color-mix(in srgb,var(--acc) 16%,transparent)}
+.tbl .rw.on .nm b::after{content:" ✓";color:var(--acc)}
+body.sel .tbl .rw[role=button]{cursor:copy}
+body[data-view=compact] .card .age:not(.old){display:none}
+@media(max-width:640px){
+  header.bar{position:static}
+  header .wrap{padding-top:8px;padding-bottom:8px;gap:6px 12px}
+  .tools{gap:6px;width:100%}
+  .tools input{flex:1 1 100%;width:auto}
+  .tools label{display:none}
+  .tools select,.tools button{padding:7px 10px;font-size:14px}
+  .seg button{padding:7px 9px}
+  .hg{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:18px}
+  .tile{padding:10px 8px}
+  .tl{font-size:13px}
+  .tv{font-size:22px;margin-top:-26px}
+  .tv span{font-size:12px}
+  .tile .hint{display:none}
+  .gh{font-size:16px}
+}
+@media(max-width:640px){.tbl .t,.tbl .a{display:none}.tbl td,.tbl th{padding:9px 10px}.tbl .v{font-size:18px}}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap">
+  <div class="brand"><h1>MQTT Viewer</h1><p>ดูค่าจากอุปกรณ์แบบสดๆ</p></div>
+  <div class="tools">
+    <input id="q" type="search" placeholder="ค้นหา เช่น กระแส, ความถี่" aria-label="ค้นหาค่า">
+    <label for="range">ดูย้อนหลัง</label>
+    <select id="range">
+      <option value="900000">15 นาที</option>
+      <option value="3600000">1 ชั่วโมง</option>
+      <option value="21600000">6 ชั่วโมง</option>
+      <option value="86400000">24 ชั่วโมง</option>
+      <option value="0">ทั้งหมดที่มี</option>
+    </select>
+    <div class="seg" id="vw" role="group" aria-label="มุมมอง"><button type="button" data-v="big" aria-pressed="true" title="การ์ดใหญ่ พร้อมกราฟ">▦ การ์ด</button><button type="button" data-v="compact" aria-pressed="false" title="การ์ดเล็ก เห็นได้มากขึ้นในหน้าเดียว">▤ กระชับ</button><button type="button" data-v="table" aria-pressed="false" title="ตารางสรุปทุกค่า">☰ ตาราง</button></div>
+    <button id="shh" type="button" aria-pressed="false" title="แสดง/ซ่อนค่าที่คุณซ่อนไว้ (เพื่อเอากลับมาแสดง)" hidden></button>
+    <button id="theme" type="button">🌙 โหมดมืด</button>
+    <button id="hbtn" type="button" hidden>📚 ข้อมูลย้อนหลัง</button>
+    <button id="wtrb" type="button" title="กราฟค่าน้ำ และวันนี้ใช้ไปกี่หน่วยกี่บาท">💧 น้ำ</button>
+    <button id="cmpb" type="button" title="เทียบแรงดัน Grid กับ Solar และคิดค่าไฟต่อวัน">⚖️ เทียบ Grid/Solar</button><button id="slb" type="button" title="เทียบกระแส 2 ค่าของ Solar panel ในกราฟเดียว">☀️ กระแส Solar</button>
+    <button id="logb" type="button">📒 Datalog</button>
+    <button id="inst" type="button" hidden>📲 ติดตั้งเป็นแอป</button>
+    <button id="rep" class="pri" hidden>📨 เลือกค่าส่ง Telegram</button>
+  </div>
+</div></header>
+
+<div class="wrap">
+  <div class="banner" id="ban" role="status"><b><i></i><em id="stxt" style="font-style:normal">กำลังเชื่อมต่อ…</em></b><span id="sum"></span></div>
+  <details class="help"><summary>วิธีอ่านหน้านี้</summary><ul>
+    <li><b>ตัวเลขใหญ่</b> คือค่าล่าสุดที่อุปกรณ์ส่งมา</li>
+    <li><b>กราฟ</b> แสดงว่าค่านั้นขึ้นหรือลงอย่างไรในช่วงเวลาที่เลือก (แตะ/เอาเมาส์ชี้ที่กราฟเพื่อดูค่าแต่ละจุด)</li>
+    <li><b>ป้ายเขียว</b> = ข้อมูลสด &nbsp; <b>ป้ายเหลือง</b> = นานแล้วที่ไม่มีข้อมูลใหม่ ควรตรวจสอบอุปกรณ์</li>
+    <li><b>▦ การ์ด / ▤ กระชับ / ☰ ตาราง</b> เปลี่ยนวิธีแสดงผลได้ที่แถบด้านบน (จำไว้ให้ในเครื่องนี้)</li>
+    <li><b>📌</b> บนการ์ดคือปักหมุดให้ขึ้นไปอยู่ด้านบนสุด &nbsp; <b>🙈</b> คือซ่อนค่าที่ไม่ต้องดู (กดปุ่ม "ซ่อนอยู่" ด้านบนเพื่อเอากลับมา)</li>
+  </ul></details>
+  <section id="hero" hidden><h3 class="gh">ภาพรวมตอนนี้ <small>แตะการ์ดหรือมาตรวัดเพื่อดูกราฟใหญ่</small></h3><div class="hg" id="hg"></div></section>
+  <main id="grid"><div class="empty" id="empty">ยังไม่มีข้อมูล รอสักครู่<br>เมื่ออุปกรณ์ส่งค่ามา จะแสดงเป็นการ์ดพร้อมกราฟให้อัตโนมัติ</div></main>
+  <div class="tw" id="tw" hidden><table class="tbl" id="tbl"><thead><tr><th>ค่า</th><th>ล่าสุด</th><th>สถานะ</th><th class="t">แนวโน้ม</th><th class="a">อัปเดต</th><th></th></tr></thead><tbody></tbody></table></div>
+</div>
+<dialog id="dlg"><div class="dh"><div><h2 id="dt"></h2><div class="sub" id="ds"></div></div><div class="da"><button id="dsend" class="pri" type="button" hidden>📨 ส่งค่านี้เข้า Telegram</button><button id="dx" type="button" aria-label="ปิด">✕ ปิด</button></div></div>
+  <div class="vr"><span class="val" id="dv"></span><span class="unit" id="du"></span><span class="tr" id="dtr"></span></div><p class="hint" id="dh2"></p>
+  <div class="dbrow" id="dbrow" hidden><label for="dsrc">ดูย้อนหลังจากฐานข้อมูล</label><select id="dsrc"></select></div>
+  <canvas id="dcv"></canvas><div class="stl" id="dsl"></div>
+  <dl class="st" id="dst"><div><dt>ต่ำสุด</dt><dd>–</dd></div><div><dt>สูงสุด</dt><dd>–</dd></div><div><dt>เฉลี่ย</dt><dd>–</dd></div><div><dt>เปลี่ยนไป</dt><dd>–</dd></div></dl>
+  <div id="dtab" hidden></div></dialog>
+<dialog id="hdlg"><div class="dh"><div><h2>📚 ข้อมูลย้อนหลัง</h2><div class="sub">ค่าที่บันทึกลงฐานข้อมูลไว้เป็นรายนาที เก็บย้อนหลัง <span id="hdays">90</span> วัน<span id="hroll"></span></div></div>
+  <div class="da"><button id="hcsv" type="button">⬇️ ดาวน์โหลด CSV</button><button id="hx" type="button" aria-label="ปิด">✕ ปิด</button></div></div>
+  <div class="dbrow"><label for="hk">ค่า</label><select id="hk"></select><label for="hr">ช่วง</label><select id="hr"></select><label for="hb">สรุปแบบ</label><select id="hb"><option value="day">รายวัน</option><option value="month">รายเดือน</option></select></div>
+  <canvas id="hcv"></canvas><div class="stl" id="hsl"></div>
+  <dl class="st" id="hst"><div><dt>ต่ำสุด</dt><dd>–</dd></div><div><dt>สูงสุด</dt><dd>–</dd></div><div><dt>เฉลี่ย</dt><dd>–</dd></div><div><dt>เปลี่ยนไป</dt><dd>–</dd></div></dl>
+  <div id="htab" hidden></div></dialog>
+<dialog id="wdlg"><div class="dh"><div><h2>💧 ค่าน้ำ · วันนี้ใช้ไปเท่าไร</h2><div class="sub">อ่านจากค่ามิเตอร์น้ำสะสม: ใช้ไป = ค่าล่าสุด − ค่าตอนเริ่มวัน (1 หน่วย = 1 ลูกบาศก์เมตร)</div></div>
+  <div class="da"><button id="wx" type="button" aria-label="ปิด">✕ ปิด</button></div></div>
+  <div class="dbrow"><label for="wk">ค่าน้ำ</label><select id="wk"></select><label for="wu">หน่วยของค่า</label><select id="wu"><option value="m">ลูกบาศก์เมตร (m³)</option><option value="l">ลิตร (L)</option></select>
+    <label for="wr">ช่วง</label><select id="wr"></select><label for="wrate">ราคาต่อหน่วย (บาท)</label><input id="wrate" type="number" min="0" step="0.01" inputmode="decimal"></div>
+  <div class="whero" id="whero"></div>
+  <div class="wt">ค่ามิเตอร์</div><canvas id="wcv"></canvas><div class="stl" id="wsl"></div>
+  <div class="wt" id="wbt">ปริมาณน้ำที่ใช้</div><canvas id="wcb"></canvas>
+  <dl class="st" id="wsum"></dl>
+  <div id="wtab"></div>
+  <p class="hint" id="wnote"></p></dialog>
+<dialog id="cdlg"><div class="dh"><div><h2>⚖️ เทียบแรงดัน Grid / Solar · ค่าไฟต่อวัน</h2><div class="sub">กราฟแรงดันสองฝั่งในกราฟเดียว และคิดค่าไฟจากพลังงานสะสม (kWh) × ราคาต่อหน่วย</div></div>
+  <div class="da"><button id="cx" type="button" aria-label="ปิด">✕ ปิด</button></div></div>
+  <div class="dbrow"><label for="cg">กริด</label><select id="cg"></select><label for="cs">โซลาร์</label><select id="cs"></select><label for="cr">ช่วง</label><select id="cr"></select>
+    <label for="ceg">ค่า kWh ของ Grid</label><select id="ceg"></select><label for="cug">หน่วย</label><select id="cug"></select>
+    <label for="ces">ค่า kWh ของ Solar</label><select id="ces"></select><label for="cus">หน่วย</label><select id="cus"></select>
+    <label for="crate">ราคาต่อหน่วย (บาท)</label><input id="crate" type="number" min="0" step="0.01" inputmode="decimal"></div>
+  <p class="hint" id="csrc"></p>
+  <dl class="st" id="csum"></dl>
+  <div class="cbh"><div class="wt" id="cbt">ใช้ไฟรายวัน</div><label for="cbm" class="sub">ดูเป็น</label><select id="cbm"><option value="d">รายวัน</option><option value="m">รายเดือน</option></select><label for="cbu" class="sub">หน่วย</label><select id="cbu"><option value="b">บาท</option><option value="k">kWh</option></select></div>
+  <div class="cleg" id="cbl"></div>
+  <canvas id="ccb"></canvas><div class="stl" id="cbs"></div>
+  <div class="wt" style="font-weight:600;color:var(--ink);font-size:15px;margin-top:16px">แรงดันไฟฟ้า</div>
+  <div class="cleg" id="cleg"></div>
+  <canvas id="ccv"></canvas><div class="stl" id="csl"></div>
+  <dl class="st" id="cst"></dl>
+  <div id="ctab"></div>
+  <p class="hint" id="cnote"></p></dialog>
+<dialog id="sdlg"><div class="dh"><div><h2>☀️ Solar panel · เทียบกระแส 2 ค่า</h2><div class="sub">วางเส้นกระแสสองค่าในกราฟเดียว ดูว่าแต่ละฝั่งจ่ายกระแสต่างกันแค่ไหนตามเวลา</div></div>
+  <div class="da"><button id="sx" type="button" aria-label="ปิด">✕ ปิด</button></div></div>
+  <div class="dbrow"><label for="sg">กลุ่ม</label><select id="sg"></select><label for="sa">ค่าที่ 1</label><select id="sa"></select><label for="sb">ค่าที่ 2</label><select id="sb"></select>
+    <label for="sr">ช่วง</label><select id="sr"></select><label><input type="checkbox" id="ssum"> แสดงเส้นรวม 1+2</label></div>
+  <div class="cleg" id="sleg"></div>
+  <canvas id="scv"></canvas><div class="stl" id="ssl"></div>
+  <dl class="st" id="sst"></dl>
+  <p class="hint" id="snote"></p></dialog>
+<dialog id="ldlg"><div class="dh"><div><h2>📒 Datalog · ค่าที่บันทึกไว้</h2><div class="sub" id="lsub"></div></div>
+  <div class="da"><button id="lflush" type="button" title="เขียนค่าที่ค้างอยู่ลงฐานข้อมูลทันที">💾 บันทึกตอนนี้</button><button id="lx" type="button" aria-label="ปิด">✕ ปิด</button></div></div>
+  <div class="note" id="loff" hidden><b>ยังไม่ได้เปิดการบันทึกถาวร</b><br>ตอนนี้ค่าเก็บอยู่ในหน่วยความจำของเซิร์ฟเวอร์เท่านั้น (หายเมื่อรีสตาร์ท) ตั้ง <b>DATABASE_URL</b> (Neon หรือ Supabase ใช้ฟรีได้) แล้วระบบจะบันทึกทุกค่าอัตโนมัติตลอดเวลา แม้ไม่มีใครเปิดหน้านี้</div>
+  <div class="note" id="lerr" hidden></div>
+  <div id="lctl"><div class="dbrow"><label for="lspan">สรุปย้อนหลัง</label>
+    <select id="lspan"><option value="1">1 วัน</option><option value="7" selected>7 วัน</option><option value="30">30 วัน</option><option value="90">90 วัน</option></select>
+    <label class="chk"><input type="checkbox" id="lall"> เฉพาะค่าสำคัญ (ไฟฟ้า อุณหภูมิ น้ำ ฯลฯ)</label><span id="lmsg" role="status"></span></div>
+    <div class="ltw lbody" id="ltab"></div>
+    <div class="dbrow"><button id="lrall" type="button" class="danger">🗑️ ล้างข้อมูลที่บันทึกทั้งหมด</button></div></div></dialog>
+<div id="selbar" role="region" aria-label="เลือกค่าที่จะส่ง Telegram"><span id="selt"></span><button id="sall" type="button">เลือกทั้งหมดที่เห็น</button><button id="sclr" type="button">ล้างที่เลือก</button><button id="ssend" class="pri" type="button">ส่งเข้า Telegram</button></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const grid = $('#grid'), cards = new Map(), series = new Map();
+const palette = ['#0891b2', '#7c4dff', '#2563eb', '#e11d6a', '#d98200', '#16a34a', '#ea580c'];
+let gap = 10000, rangeMs = 3600e3, st = {}, wsUp = false, histMs = 86400e3, histMax = 10000;   // histMs/histMax รับค่าจริงจากเซิร์ฟเวอร์ตอน snapshot
+const STALE = 300e3;
+
+// ---------- ธีม ----------
+function setTheme(t) { document.documentElement.dataset.theme = t; { const tc = document.getElementById('tc'); if (tc) tc.content = t === 'dark' ? '#060a12' : '#edf2f5'; } $('#theme').textContent = t === 'dark' ? '☀️ โหมดสว่าง' : '🌙 โหมดมืด'; try { localStorage.setItem('theme', t); } catch {} cards.forEach(mark); }
+let th0 = null; try { th0 = localStorage.getItem('theme'); } catch {}
+setTheme(th0 || 'dark');
+$('#theme').onclick = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+
+try { const r = localStorage.getItem('range'); if (r !== null) { rangeMs = +r; $('#range').value = r; } } catch {}
+if ($('#range').value !== String(rangeMs)) { $('#range').value = '3600000'; rangeMs = 3600e3; }
+const rangeTxt = () => rangeMs ? $('#range').selectedOptions[0].textContent + 'ล่าสุด' : 'ทั้งหมดที่มี';
+
+const fmt = v => v == null ? '–' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 3 });
+const p2 = n => String(n).padStart(2, '0');
+const hm = t => { const d = new Date(t); return p2(d.getHours()) + ':' + p2(d.getMinutes()); };
+const hms = t => hm(t) + ':' + p2(new Date(t).getSeconds());
+const dm = t => { const d = new Date(t); return p2(d.getDate()) + '/' + p2(d.getMonth() + 1); };
+const ago = ms => { const s = Math.max(0, Math.round(ms / 1000)); return s < 90 ? s + ' วิที่แล้ว' : s < 5400 ? Math.round(s / 60) + ' นาทีที่แล้ว' : (s / 3600).toFixed(1) + ' ชม.ที่แล้ว'; };
+const hash = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
+
+// ---------- แปลชื่อเทคนิคเป็นภาษาคน ----------
+const DICT = [
+  [/energy|kwh/i, 'พลังงานไฟฟ้าที่ใช้สะสม', '🔋', 'ปริมาณไฟฟ้าที่ใช้ไปรวมทั้งหมด ตัวเลขจะค่อยๆ เพิ่มขึ้นเรื่อยๆ ยิ่งเพิ่มเร็ว = ใช้ไฟมาก', '#2563eb'],
+  [/power\s*factor|\bpf\b/i, 'ประสิทธิภาพการใช้ไฟ', '⚙️', 'ยิ่งใกล้ 1 ยิ่งดี แปลว่าไฟที่จ่ายถูกใช้งานได้เต็มที่ (Power factor)', '#d98200'],
+  [/(power|watt).*(high|max|peak)|(high|max|peak).*(power|watt)/i, 'กำลังไฟสูงสุด', '📈', 'ตอนที่ใช้ไฟหนักที่สุดในรอบที่วัด ใช้ดูว่าช่วงใช้ไฟหนักสูงแค่ไหน', '#0891b2'],
+  [/power|watt|\bkw\b/i, 'กำลังไฟที่ใช้ตอนนี้', '💡', 'ตอนนี้ใช้ไฟมากแค่ไหน ตัวเลขสูง = ใช้ไฟมาก', '#0891b2'],
+  [/current|\bamps?\b/i, 'กระแสไฟฟ้า', '🔌', 'ปริมาณไฟที่ไหลผ่านอยู่ ตัวเลขสูง = มีการใช้ไฟมาก', '#7c4dff'],
+  [/volt/i, 'แรงดันไฟฟ้า', '🔆', 'ไฟบ้านในไทยปกติอยู่ราว 220–240 โวลต์', '#ea580c'],
+  [/freq|\bhz\b/i, 'ความถี่ไฟฟ้า', '〰️', 'ไฟฟ้าในไทยปกติอยู่ที่ประมาณ 50 เฮิรตซ์ ถ้าใกล้ 50 และนิ่ง แปลว่าระบบไฟปกติ', '#e11d6a'],
+  [/temp/i, 'อุณหภูมิ', '🌡️', '', '#ea580c'],
+  [/humid/i, 'ความชื้น', '💧', '', '#2563eb'],
+  [/water|flow/i, 'น้ำ / อัตราการไหล', '🚰', '', '#0891b2'],
+  [/\bpress/i, 'ความดัน', '🧭', '', '#7c4dff']
+];
+const UNITS = { hz: 'Hz', kwh: 'kWh', w: 'W', kw: 'kW', a: 'A', v: 'V' };
+function info(id, numeric) {
+  if (!numeric) { const raw = id.slice(2); return { title: raw.slice(raw.lastIndexOf('/') + 1) || raw, raw, ic: '💬', hint: 'ข้อความที่อุปกรณ์ส่งมา', color: palette[hash(id) % palette.length], unit: '' }; }
+  const parts = id.split(' › ');
+  const raw = parts.length > 1 ? parts.slice(1).join(' › ') : id.slice(id.lastIndexOf('/') + 1);
+  const m = raw.match(/^(.*?) · (.*)$/), nm = m ? m[2] : raw;
+  const u = nm.match(/\(([^)]+)\)\s*$/), unit = u ? (UNITS[u[1].toLowerCase()] || u[1]) : '';
+  const base = nm.replace(/\s*\([^)]*\)\s*$/, '');
+  const d = DICT.find(x => x[0].test(base));
+  return { eq: m ? m[1] : '', title: d ? d[1] : base, raw, ic: d ? d[2] : '📊', hint: d ? d[3] : '', color: d ? d[4] : palette[hash(id) % palette.length], unit };
+}
+
+const groups = new Map();
+// ---------- มุมมอง · ปักหมุด · ซ่อน (จำไว้ในเครื่องนี้ ไม่กระทบคนอื่น) ----------
+const loadSet = k => { try { return new Set(JSON.parse(localStorage.getItem(k) || '[]')); } catch { return new Set(); } };
+const saveSet = (k, s) => { try { localStorage.setItem(k, JSON.stringify([...s])); } catch {} };
+const pins = loadSet('pins'), hid = loadSet('hid');
+let view = 'big', showHid = false;
+try { const v = localStorage.getItem('view'); if (v === 'compact' || v === 'table') view = v; } catch {}
+document.body.dataset.view = view;
+const pinGrp = (() => {        // กลุ่ม "ปักหมุดไว้" อยู่บนสุดเสมอ
+  const sec = document.createElement('section'); sec.className = 'grp pin'; sec.hidden = true;
+  sec.innerHTML = '<h3 class="gh"><span>📌 ปักหมุดไว้</span><small></small></h3><div class="gg"></div>';
+  grid.prepend(sec);
+  return { name: '📌 ปักหมุดไว้', sec, body: sec.querySelector('.gg'), cnt: sec.querySelector('small') };
+})();
+const grpVis = g => { g.sec.hidden = ![...g.body.children].some(e => !e.hidden); };
+function relayoutGroup(g) {
+  const mine = [...cards.values()].filter(x => x.at === g).sort((a, b) => a.id.localeCompare(b.id));
+  mine.forEach(x => g.body.appendChild(x.el));
+  g.cnt.textContent = mine.filter(x => showHid || !hid.has(x.id)).length + ' ค่า';
+  grpVis(g);
+}
+function mkActs(c) {
+  const box = document.createElement('span'); box.className = 'acts';
+  const mkb = (cls, txt, fn) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ib ' + cls; b.textContent = txt;
+    b.onclick = e => { e.stopPropagation(); fn(c); };
+    b.onkeydown = e => e.stopPropagation();            // กด Enter ที่ปุ่ม ไม่ให้ไปเปิดกราฟใหญ่ของการ์ด
+    box.appendChild(b); return b;
+  };
+  return { box, pn: mkb('pn', '📌', togglePin), hd: mkb('hd', '🙈', toggleHid) };
+}
+function actUp(c) {
+  const p = pins.has(c.id), h = hid.has(c.id);
+  c.el.classList.toggle('pinned', p); c.el.classList.toggle('dim', h); c.row.tr.classList.toggle('dim', h);
+  const pt = p ? 'เลิกปักหมุด' : 'ปักหมุดไว้ด้านบนสุด', ht = h ? 'แสดงค่านี้อีกครั้ง' : 'ซ่อนค่านี้ (ไม่ต้องดู)';
+  for (const a of c.acts) {
+    a.pn.setAttribute('aria-pressed', p); a.pn.title = pt; a.pn.setAttribute('aria-label', pt);
+    a.hd.textContent = h ? '👁' : '🙈'; a.hd.title = ht; a.hd.setAttribute('aria-label', ht);
+  }
+}
+function togglePin(c) {
+  pins.has(c.id) ? pins.delete(c.id) : pins.add(c.id); saveSet('pins', pins);
+  const old = c.at; c.at = pins.has(c.id) ? pinGrp : c.group;
+  actUp(c); relayoutGroup(c.at); if (old !== c.at) relayoutGroup(old); rebuildTable();
+}
+function toggleHid(c) {
+  hid.has(c.id) ? hid.delete(c.id) : hid.add(c.id); saveSet('hid', hid);
+  if (showHid && ![...cards.values()].some(x => hid.has(x.id))) showHid = false;
+  actUp(c); refreshVis();
+}
+function hidUp() {
+  const n = [...cards.values()].filter(c => hid.has(c.id)).length, b = $('#shh');
+  b.hidden = !n; b.textContent = showHid ? `👁 ซ่อนกลับ (${n})` : `🙈 ซ่อนอยู่ ${n} ค่า`;
+  b.setAttribute('aria-pressed', showHid); document.body.classList.toggle('showhid', showHid);
+}
+function refreshVis() { cards.forEach(applyFilter); [pinGrp, ...groups.values()].forEach(relayoutGroup); tblVis(); hidUp(); }
+const heroVis = () => { $('#hero').hidden = !tiles.size || ![...tiles.values()].some(t => !t.el.hidden); };
+
+// ตารางสรุป (มุมมอง ☰ ตาราง)
+const tbody = $('#tbl tbody');
+const put = (el, t) => { if (el.textContent !== t) el.textContent = t; };
+function makeRow(c) {
+  const tr = document.createElement('tr'); tr.className = 'rw'; tr.style.setProperty('--c', c.f.color); tr.title = c.id.replace(/^t:/, '');
+  tr.innerHTML = '<td><div class="nc"><span class="ic"></span><span class="nm"><b></b><small></small></span></div></td><td class="v"></td><td><span class="sb"></span></td><td class="t"></td><td class="a"><span class="age"></span></td><td class="x"></td>';
+  const q = s => tr.querySelector(s);
+  q('.ic').textContent = c.f.ic; q('b').textContent = c.f.title; q('small').textContent = c.f.raw;
+  const a = mkActs(c); q('.x').appendChild(a.box); c.acts.push(a);
+  if (c.numeric) { tr.tabIndex = 0; tr.setAttribute('role', 'button'); tr.onclick = () => act(c); tr.onkeydown = e => { if (e.key === 'Enter') act(c); }; }
+  return { tr, v: q('.v'), sb: q('.sb'), t: q('.t'), age: q('.age') };
+}
+function rowUp(c) {
+  const r = c.row; if (view !== 'table' || !r) return;
+  put(r.v, c.numeric ? (c.last ? fmt(c.last.v) + (c.f.unit ? ' ' + c.f.unit : '') : '–') : (c.text || '–').slice(0, 80));
+  r.v.className = 'v' + (c.numeric ? '' : ' txt');
+  const sv = c.numeric ? statusOf(c) : null; put(r.sb, sv ? sv[0] : ''); r.sb.className = 'sb' + (sv ? ' ' + sv[1] : '');
+  const tc = c.trEl ? c.trEl.className : ''; put(r.t, c.trEl ? c.trEl.textContent : ''); r.t.className = 't' + (tc.includes(' up') ? ' up' : tc.includes(' dn') ? ' dn' : '');
+  put(r.age, c.ageEl.textContent); r.age.className = c.ageEl.className;
+}
+function tblVis() {            // ซ่อนหัวกลุ่มที่ไม่มีแถวให้เห็น
+  if (view !== 'table') return;
+  let hr = null, any = false;
+  const close = () => { if (hr) hr.hidden = !any; };
+  for (const tr of tbody.children) { if (tr.classList.contains('gr')) { close(); hr = tr; any = false; } else if (!tr.hidden) any = true; }
+  close();
+}
+let tbRaf = 0;
+function rebuildTable() {
+  if (view !== 'table' || tbRaf) return;
+  tbRaf = requestAnimationFrame(() => {
+    tbRaf = 0;
+    const out = [], hr = g => g.hr || (g.hr = Object.assign(document.createElement('tr'), { className: 'gr', innerHTML: '<th colspan="6"></th>' }));
+    for (const g of [pinGrp, ...[...groups.values()].sort((x, y) => x.name.localeCompare(y.name))]) {
+      const cs = [...cards.values()].filter(c => c.at === g).sort((a, b) => a.id.localeCompare(b.id)); if (!cs.length) continue;
+      const h = hr(g); h.firstChild.textContent = g === pinGrp ? g.name : '📡 ' + g.name; out.push(h, ...cs.map(c => c.row.tr));
+    }
+    if (!out.length) { const e = document.createElement('tr'); e.className = 'em'; e.innerHTML = '<td colspan="6">ยังไม่มีข้อมูล รอสักครู่</td>'; out.push(e); }
+    tbody.replaceChildren(...out); cards.forEach(rowUp); tblVis();
+  });
+}
+function setView(v) {
+  view = v; document.body.dataset.view = v; try { localStorage.setItem('view', v); } catch {}
+  document.querySelectorAll('#vw button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v));
+  $('#tw').hidden = v !== 'table'; grid.hidden = v === 'table';
+  if (v === 'table') rebuildTable();
+  cards.forEach(mark);                      // วาดกราฟใหม่ให้พอดีกับขนาดการ์ดใหม่
+}
+
+// topic ที่ส่งค่ามา (ใช้แสดงเป็นข้อความรอง)
+const topicOf = id => id.startsWith('t:') ? id.slice(2) : id.split(' › ')[0];
+// หมวด = ชื่ออุปกรณ์ (Equipment) เช่น "Solar Cell", "Grid In"; ถ้าค่านั้นไม่มีชื่ออุปกรณ์ ใช้ topic เป็นหมวดแทน
+const groupOf = id => {
+  if (id.startsWith('t:')) return id.slice(2);
+  const p = id.split(' › '), m = p.length > 1 && p.slice(1).join(' › ').match(/^(.*?) · /);
+  return m ? m[1] : p[0];
+};
+function getGroup(name) {
+  let g = groups.get(name); if (g) return g;
+  const sec = document.createElement('section'); sec.className = 'grp';
+  sec.innerHTML = '<h3 class="gh"><span></span><small></small></h3><div class="gg"></div>';
+  sec.querySelector('span').textContent = '📡 ' + name;
+  g = { name, sec, body: sec.querySelector('.gg'), cnt: sec.querySelector('small') };
+  groups.set(name, g);
+  [...groups.values()].sort((x, y) => x.name.localeCompare(y.name)).forEach(x => grid.appendChild(x.sec));
+  return g;
+}
+
+function getCard(id, numeric) {
+  let c = cards.get(id); if (c) return c;
+  const f = info(id, numeric);
+  const el = document.createElement('article'); el.className = 'card';
+  el.style.setProperty('--c', f.color);
+  el.innerHTML = `<div class="head"><div class="ic"></div><div class="tt"><h2></h2><div class="sub"></div></div><span class="age"></span><span class="ck" aria-hidden="true"></span></div>` +
+    (numeric
+      ? `<div class="vr"><span class="val"></span><span class="unit"></span><span class="sb"></span><span class="tr"></span></div><p class="hint"></p><canvas></canvas><div class="stl"></div><dl class="st">${['ต่ำสุด', 'สูงสุด', 'เฉลี่ย', 'เปลี่ยนไป'].map(l => `<div><dt>${l}</dt><dd>–</dd></div>`).join('')}</dl>`
+      : `<div class="val text"></div>`);
+  const q = s => el.querySelector(s);
+  q('.ic').textContent = f.ic; q('h2').textContent = f.title; q('.sub').textContent = f.raw; el.title = id.replace(/^t:/, '');
+  c = { id, el, numeric, f, last: null, t: 0, text: '', pts: [], hx: null, vEl: q('.val'), ageEl: q('.age'), cv: q('canvas'), dd: [...el.querySelectorAll('dd')], trEl: q('.tr'), sbEl: q('.sb'), stl: q('.stl') };
+  if (numeric) {
+    c.color = f.color; q('.unit').textContent = f.unit; q('.hint').textContent = f.hint;
+    const move = e => { c.hx = e.clientX - c.cv.getBoundingClientRect().left; mark(c); };
+    c.cv.addEventListener('pointermove', move); c.cv.addEventListener('pointerdown', move);
+    c.cv.addEventListener('pointerleave', () => { c.hx = null; mark(c); });
+  }
+  if (numeric) { el.tabIndex = 0; el.setAttribute('role', 'button'); el.onclick = () => act(c); el.onkeydown = e => { if (e.key === 'Enter') act(c); }; }
+  c.acts = []; { const a = mkActs(c); q('.age').after(a.box); c.acts.push(a); }
+  c.row = makeRow(c);
+  cards.set(id, c);
+  $('#empty')?.remove();
+  c.group = getGroup(groupOf(id));
+  c.at = pins.has(id) ? pinGrp : c.group;
+  relayoutGroup(c.at);
+  actUp(c);
+  if (numeric) makeTile(c);
+  applyFilter(c);
+  selMark(id); selUp(); hidUp(); rebuildTable();
+  return c;
+}
+function applyFilter(c) {
+  const k = $('#q').value.trim().toLowerCase(), off = hid.has(c.id) && !showHid;      // off = ผู้ใช้ซ่อนไว้
+  c.el.hidden = off || (!!k && !(c.id + ' ' + c.f.title + ' ' + c.f.raw).toLowerCase().includes(k));
+  const t = tiles.get(c.id); if (t) t.el.hidden = off;
+  if (c.row) c.row.tr.hidden = c.el.hidden;
+  if (c.at) grpVis(c.at);
+  heroVis();
+}
+
+const dirty = new Set(); let raf = 0;
+function mark(c) { dirty.add(c); raf = raf || requestAnimationFrame(() => { raf = 0; dirty.forEach(paint); dirty.clear(); }); }
+
+function setAge(c) {
+  const old = c.t && Date.now() - c.t > STALE;
+  c.ageEl.textContent = c.t ? (old ? 'ไม่มีข้อมูลใหม่ ' + ago(Date.now() - c.t).replace(' ที่แล้ว', '').replace('ที่แล้ว', '') : 'สด · ' + ago(Date.now() - c.t)) : '';
+  c.ageEl.classList.toggle('old', !!old);
+  rowUp(c);
+}
+
+function paint(c) {
+  setAge(c);
+  if (!c.numeric) { c.vEl.textContent = c.text; rowUp(c); return; }
+  const a = series.get(c.id) || [], since = rangeMs ? Date.now() - rangeMs : 0;
+  const pts = c.pts = since ? a.filter(p => p[0] >= since) : a;
+  setVal(c);
+  c.stl.textContent = 'สรุป' + rangeTxt();
+  if (pts.length) {
+    let lo = Infinity, hi = -Infinity, sum = 0;
+    for (const [, v] of pts) { sum += v; if (v < lo) lo = v; if (v > hi) hi = v; }
+    const d = pts[pts.length - 1][1] - pts[0][1];
+    c.stat = [fmt(lo), fmt(hi), fmt(sum / pts.length), (d > 0 ? '+' : '') + fmt(d)]; c.stat.forEach((s, i) => c.dd[i].textContent = s);
+    const flat = Math.abs(d) < (hi - lo) * 0.05 || d === 0;
+    c.trEl.textContent = pts.length < 2 ? '' : flat ? '● ค่อนข้างคงที่' : d > 0 ? '▲ เพิ่มขึ้น' : '▼ ลดลง';
+    c.trEl.className = 'tr' + (pts.length < 2 || flat ? '' : d > 0 ? ' up' : ' dn');
+  } else { c.dd.forEach(x => x.textContent = '–'); c.trEl.textContent = ''; c.stat = null; }
+  draw(c); after(c);
+}
+
+// ทำสีให้สว่างขึ้นเข้าหาขาว k (0-1) ใช้กับกราฟโหมดมืดให้ดูเป็นนีออน
+const lite = (hex, k) => { const n = parseInt(hex.slice(1), 16); return '#' + [16, 8, 0].map(s => { const v = (n >> s) & 255; return Math.round(v + (255 - v) * k).toString(16).padStart(2, '0'); }).join(''); };
+// ---------- ตัวช่วยวาดกราฟเส้น (ใช้ร่วมกันทุกกราฟ) ----------
+// แกน Y: เลือกขั้นเป็นเลขกลม (1/2/5 × 10ⁿ) แทนการหารช่วงเป็น 3 ส่วนเท่าๆ กันที่ได้เลขเศษ เช่น 229.37
+const yFmt = (v, d) => v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+function yTicks(lo, hi, n) {
+  const raw = (hi - lo) / n, p = 10 ** Math.floor(Math.log10(raw)), f = raw / p, st = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+  const dec = Math.max(0, -Math.floor(Math.log10(st) + 1e-9)), out = [];
+  for (let k = Math.ceil(lo / st - 1e-9), e = Math.floor(hi / st + 1e-9); k <= e; k++) out.push(+(k * st).toFixed(dec));
+  return { ticks: out, dec };
+}
+// กว้างป้ายแกน Y ตามตัวเลขจริง กันตัวเลขยาวทับเส้นกราฟ
+function yAxis(g, lo, hi, ph) {
+  const { ticks, dec } = yTicks(lo, hi, Math.max(2, Math.min(5, Math.floor(ph / 40)))), lab = ticks.map(v => yFmt(v, dec));
+  return { ticks, lab, L: Math.ceil(Math.max(20, ...lab.map(x => g.measureText(x).width))) + 14 };
+}
+// แกนเวลา: ติ๊กที่เวลากลมๆ (ทุก 10 นาที, 1 ชม., 6 ชม., เที่ยงคืน ฯลฯ) ตามเวลาท้องถิ่น
+function tTicks(t0, t1, maxN) {
+  const M = 6e4, H = 36e5, D = 864e5, S = [M, 2 * M, 5 * M, 10 * M, 15 * M, 30 * M, H, 2 * H, 3 * H, 6 * H, 12 * H, D, 2 * D, 7 * D, 14 * D, 30 * D];
+  const st = S.find(x => (t1 - t0) / x <= maxN) || S[S.length - 1], out = [], d = new Date(t0); d.setHours(0, 0, 0, 0);
+  if (st >= D) { const k = Math.round(st / D); for (let i = 0; d.getTime() <= t1; i++, d.setDate(d.getDate() + 1)) if (i % k === 0 && d.getTime() >= t0) out.push(d.getTime()); }
+  else { const b = d.getTime(); for (let t = b + Math.ceil((t0 - b) / st) * st; t <= t1; t += st) out.push(t); }
+  return { ticks: out.length ? out : [t0, t1], st };
+}
+function drawAxes(g, a) {
+  g.lineWidth = 1; g.strokeStyle = a.grid; g.fillStyle = a.mute; g.textAlign = 'right'; g.textBaseline = 'middle';
+  a.ya.ticks.forEach((v, i) => { const y = Math.round(a.Y(v)) + .5; g.beginPath(); g.moveTo(a.L, y); g.lineTo(a.w - a.R, y); g.stroke(); g.fillText(a.ya.lab[i], a.L - 6, y); });
+  const { ticks, st } = tTicks(a.t0, a.t1, Math.max(2, Math.min(8, Math.floor(a.pw / 64)))), span = a.t1 - a.t0, f0 = g.font;
+  let edge = -1e9; g.textAlign = 'center';
+  for (const t of ticks) {
+    const x = a.X(t), d = new Date(t), day = st >= 864e5 || (!d.getHours() && !d.getMinutes() && span > 20 * 36e5), txt = day ? dm(t) : hm(t);
+    g.font = day ? '600 ' + f0 : f0;
+    const tw = g.measureText(txt).width, cx = Math.min(Math.max(x, a.L + tw / 2), a.w - a.R - tw / 2), gx = Math.round(x) + .5;
+    g.strokeStyle = a.grid; g.beginPath(); g.moveTo(gx, a.T); g.lineTo(gx, a.T + a.ph); g.stroke();
+    if (cx - tw / 2 < edge + 8) continue;
+    g.fillStyle = day ? a.ink : a.mute; g.fillText(txt, cx, a.h - 9); edge = cx + tw / 2;
+  }
+  g.font = f0;
+}
+// แบ่งข้อมูลเป็นช่วงๆ ที่ขาดหายนาน (เช่น อุปกรณ์ออฟไลน์) จะไม่ลากเส้นตรงข้ามช่องว่างให้ดูเหมือนมีข้อมูล
+function segs(pts, span) {
+  if (pts.length < 3) return [pts];
+  const d = []; for (let i = 1; i < pts.length; i++) d.push(pts[i][0] - pts[i - 1][0]);
+  const med = d.slice().sort((x, y) => x - y)[d.length >> 1], thr = Math.max(med * 6, span / 30, 90e3), out = []; let cur = [pts[0]];
+  for (let i = 1; i < pts.length; i++) { if (d[i - 1] > thr) { out.push(cur); cur = []; } cur.push(pts[i]); }
+  out.push(cur); return out;
+}
+function strokeSegs(g, ss, X, Y, base, col, o) {
+  const tr = s => s.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])));
+  if (o.fill) {
+    const gr = g.createLinearGradient(0, o.T, 0, base); gr.addColorStop(0, col + '3a'); gr.addColorStop(1, col + '00'); g.fillStyle = gr;
+    for (const s of ss) if (s.length > 1) { g.beginPath(); tr(s); g.lineTo(X(s[s.length - 1][0]), base); g.lineTo(X(s[0][0]), base); g.closePath(); g.fill(); }
+  }
+  if (ss.length > 1) {   // ช่วงที่ไม่มีข้อมูล: เส้นประจางๆ
+    g.save(); g.setLineDash([3, 5]); g.globalAlpha = .4; g.strokeStyle = col; g.lineWidth = 1.5; g.beginPath();
+    for (let i = 1; i < ss.length; i++) { const a = ss[i - 1][ss[i - 1].length - 1], b = ss[i][0]; g.moveTo(X(a[0]), Y(a[1])); g.lineTo(X(b[0]), Y(b[1])); }
+    g.stroke(); g.restore();
+  }
+  if (o.dark) { g.shadowColor = col; g.shadowBlur = 10; }
+  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = o.lw; g.lineJoin = 'round'; g.lineCap = 'round';
+  for (const s of ss) { if (s.length === 1) { g.beginPath(); g.arc(X(s[0][0]), Y(s[0][1]), o.lw * .9, 0, 7); g.fill(); } else { g.beginPath(); tr(s); g.stroke(); } }
+  g.shadowBlur = 0;
+}
+
+function draw(c) {
+  const dark = document.documentElement.dataset.theme === 'dark', col = dark ? lite(c.color, .3) : c.color;
+  const cv = c.cv, w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (!w) return;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement), gridC = css.getPropertyValue('--grid'), mute = css.getPropertyValue('--mute'), ink = css.getPropertyValue('--ink'), card = css.getPropertyValue('--card');
+  g.font = '12px Sarabun, system-ui, sans-serif'; g.textBaseline = 'middle';
+  const mini = view === 'compact' && !!cv.closest('.card'), R = mini ? 6 : 10, T = mini ? 6 : 10, B = mini ? 6 : 22, ph = h - T - B, pts = c.pts;
+  if (!pts.length) { g.fillStyle = mute; g.textAlign = 'left'; g.fillText('ยังไม่มีข้อมูลในช่วงเวลานี้', mini ? 6 : 50, h / 2); return; }
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
+  if (lo === hi) { const d = Math.abs(lo) * .05 || 1; lo -= d; hi += d; } else { const d = (hi - lo) * .08; lo -= d; hi += d; }
+  const ya = mini ? null : yAxis(g, lo, hi, ph), L = mini ? 6 : ya.L, pw = w - L - R;
+  const rm = c.rng !== undefined ? c.rng : rangeMs;   // c.rng = ช่วงเวลาที่บังคับ (ใช้ตอนดูย้อนหลังจากฐานข้อมูล)
+  const t1 = Math.max(Date.now(), pts[pts.length - 1][0]), t0 = rm ? t1 - rm : pts[0][0];
+  const X = t => L + (t1 === t0 ? pw : (t - t0) / (t1 - t0) * pw), Y = v => T + (1 - (v - lo) / (hi - lo)) * ph, long = t1 - t0 > 36 * 3600e3;
+  if (!mini) drawAxes(g, { w, h, L, R, T, pw, ph, ya, t0, t1, X, Y, mute, ink, grid: gridC });
+  strokeSegs(g, segs(pts, t1 - t0), X, Y, T + ph, col, { fill: pts.length > 1, T, dark, lw: mini ? 2 : 2.5 });
+  const lp = pts[pts.length - 1]; g.fillStyle = card; g.strokeStyle = col; g.lineWidth = 3; if (dark) { g.shadowColor = col; g.shadowBlur = 16; } g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 4.5, 0, 7); g.fill(); g.stroke(); g.shadowBlur = 0;
+  if (!mini && c.hx != null) {
+    let best = pts[0], bd = Infinity;
+    for (const p of pts) { const d = Math.abs(X(p[0]) - c.hx); if (d < bd) { bd = d; best = p; } }
+    const x = X(best[0]), y = Y(best[1]);
+    g.strokeStyle = mute; g.lineWidth = 1; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.setLineDash([]);
+    g.fillStyle = col; g.beginPath(); g.arc(x, y, 4.5, 0, 7); g.fill();
+    const txt = fmt(best[1]) + (c.f.unit ? ' ' + c.f.unit : '') + '  ·  ' + (long ? dm(best[0]) + ' ' : '') + hms(best[0]), tw = g.measureText(txt).width + 16;
+    const bx = Math.min(Math.max(x - tw / 2, L), w - R - tw), by = y < T + 34 ? y + 12 : y - 32;
+    g.fillStyle = ink; g.beginPath(); g.roundRect ? g.roundRect(bx, by, tw, 22, 6) : g.rect(bx, by, tw, 22); g.fill();
+    g.fillStyle = card; g.textAlign = 'left'; g.fillText(txt, bx + 8, by + 11.5);
+  }
+}
+
+// ---------- ลูกเล่น: ตัวเลขวิ่ง · มาตรวัด · หน้าต่างกราฟใหญ่ ----------
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function setVal(c) {
+  const v = c.last ? c.last.v : null;
+  if (v == null) { c.vEl.textContent = '–'; return; }
+  if (c.shown === v) return;
+  const from = c.shown; c.shown = v; cancelAnimationFrame(c.anim);
+  if (from == null || reduce) { c.vEl.textContent = fmt(v); return; }
+  const t0 = performance.now();
+  const step = n => { const k = Math.min(1, (n - t0) / 600), e = 1 - (1 - k) ** 3; c.vEl.textContent = fmt(from + (v - from) * e); if (k < 1) c.anim = requestAnimationFrame(step); };
+  c.anim = requestAnimationFrame(step);
+  c.el.classList.remove('flash'); void c.el.offsetWidth; c.el.classList.add('flash');
+}
+// เกณฑ์ปกติใช้ค่ามาตรฐานไฟฟ้าไทย (230V ±10%, 50Hz ±0.5) — แก้ได้ที่นี่
+const SPEC = {
+  'กำลังไฟที่ใช้ตอนนี้': { dyn: 1 }, 'กระแสไฟฟ้า': { dyn: 1 },
+  'แรงดันไฟฟ้า': { min: 180, max: 260, ok: [207, 253], r: 'ช่วงปกติ 207–253' },
+  'ความถี่ไฟฟ้า': { min: 48, max: 52, ok: [49.5, 50.5], r: 'ช่วงปกติ 49.5–50.5' },
+  'ประสิทธิภาพการใช้ไฟ': { min: 0, max: 1, ok: [.85, 1.01], r: 'ดีเมื่อ 0.85 ขึ้นไป' }
+};
+const ORDER = Object.keys(SPEC), LEN = 157.08, tiles = new Map();
+function statusOf(c) {
+  const s = SPEC[c.f.title]; if (!s || !s.ok || !c.last) return null;
+  const v = c.last.v; return v >= s.ok[0] && v <= s.ok[1] ? ['ปกติ', 'ok'] : ['นอกช่วงปกติ', 'warn'];
+}
+function makeTile(c) {
+  const s = SPEC[c.f.title]; if (!s || tiles.size >= 8) return;
+  const el = document.createElement('article'); el.className = 'tile'; el.style.setProperty('--c', c.color);
+  el.tabIndex = 0; el.setAttribute('role', 'button');
+  let zn = '';
+  if (s.ok) { const a = (s.ok[0] - s.min) / (s.max - s.min), b = Math.min(1, (s.ok[1] - s.min) / (s.max - s.min)); zn = `<path class="zn" d="M10 62A50 50 0 0 1 110 62" style="stroke-dasharray:${LEN * (b - a)} ${LEN};stroke-dashoffset:${-LEN * a}"/>`; }
+  el.innerHTML = `<span class="ck" aria-hidden="true"></span><div class="tl"></div><small></small><svg class="gs" viewBox="0 0 120 70" aria-hidden="true"><path class="tk" d="M10 62A50 50 0 0 1 110 62"/>${zn}<path class="fl" d="M10 62A50 50 0 0 1 110 62"/></svg><div class="tv"></div><div class="tt2"></div><p class="hint"></p>`;
+  el.querySelector('.tl').textContent = c.f.ic + ' ' + c.f.title;
+  el.querySelector('small').textContent = c.f.raw.replace(/\s*\([^)]*\)\s*$/, '');
+  el.querySelector('.hint').textContent = s.r ? s.r + ' ' + c.f.unit : '';
+  const t = { c, el, s, fl: el.querySelector('.fl'), vEl: el.querySelector('.tv'), st: el.querySelector('.tt2') };
+  el.onclick = () => act(c); el.onkeydown = e => { if (e.key === 'Enter') act(c); };
+  el.hidden = hid.has(c.id) && !showHid;
+  tiles.set(c.id, t);
+  [...tiles.values()].sort((x, y) => ORDER.indexOf(x.c.f.title) - ORDER.indexOf(y.c.f.title) || x.c.id.localeCompare(y.c.id)).forEach(x => $('#hg').appendChild(x.el));
+  heroVis();
+}
+function tileUp(t) {
+  const c = t.c, s = t.s, v = c.last ? c.last.v : null; if (v == null) return;
+  let min = s.min, max = s.max;
+  if (s.dyn) { min = 0; max = (Math.max(v, ...c.pts.map(p => p[1])) * 1.25) || 1; }
+  const k = Math.max(0, Math.min(1, (v - min) / (max - min))), sv = statusOf(c);
+  t.fl.style.strokeDashoffset = LEN * (1 - k);
+  t.el.dataset.s = sv ? sv[1] : '';
+  t.el.classList.toggle('stale', !!c.t && Date.now() - c.t > STALE);
+  t.vEl.innerHTML = fmt(v) + (c.f.unit ? '<span></span>' : ''); if (c.f.unit) t.vEl.querySelector('span').textContent = c.f.unit;
+  t.st.textContent = sv ? sv[0] : c.trEl.textContent; t.st.className = 'tt2' + (sv ? ' ' + sv[1] : '');
+}
+let dlgC = null, dhx = null;
+function after(c) {
+  const sv = statusOf(c); c.sbEl.textContent = sv ? sv[0] : ''; c.sbEl.className = 'sb' + (sv ? ' ' + sv[1] : '');
+  const t = tiles.get(c.id); if (t) tileUp(t);
+  rowUp(c);
+  if (dlgC === c) dlgUp();
+}
+function openDlg(c) {
+  dlgC = c; $('#dlg').style.setProperty('--c', c.color || '#22e1ff'); $('#dt').textContent = c.f.ic + ' ' + c.f.title; $('#ds').textContent = c.f.raw; $('#du').textContent = c.f.unit; $('#dh2').textContent = c.f.hint;
+  dbInit(); $('#dsend').hidden = !st.tg || !!c.ghost; $('#dlg').showModal(); if (!c.ghost) mark(c); setTimeout(dlgUp, 0);
+}
+// ดูย้อนหลังจากฐานข้อมูล (แสดงเฉพาะเมื่อเซิร์ฟเวอร์ตั้ง DATABASE_URL)
+let dbPts = null, dbSpan = 0, dbTok = 0, dbErr = '';
+const DBOPTS = [[0, 'ข้อมูลสด (ตามช่วงด้านบน)'], [1, '1 วันล่าสุด'], [7, '7 วันล่าสุด'], [30, '30 วันล่าสุด'], [90, '90 วันล่าสุด']];
+function dbInit() {
+  dbTok++; dbPts = null; dbSpan = 0; dbErr = '';
+  const s = $('#dsrc'); $('#dbrow').hidden = !st.db; s.textContent = '';
+  for (const [d, t] of DBOPTS) if (!d || d <= (st.dbDays || 90)) s.add(new Option(t, d));
+  s.value = '0'; $('#dtab').hidden = true;
+}
+function dbTable(rows, box = $('#dtab'), all = false) {
+  box.hidden = !rows.length; if (!rows.length) return box.replaceChildren();
+  const tb = document.createElement('table');
+  tb.innerHTML = '<thead><tr><th>วันที่</th><th>ต่ำสุด</th><th>สูงสุด</th><th>เฉลี่ย</th><th>เปลี่ยนไป</th></tr></thead>';
+  const body = tb.createTBody();
+  for (const r of (all ? rows : rows.slice(-31)).slice().reverse()) {
+    const tr = body.insertRow();
+    [r.d, fmt(r.mn), fmt(r.mx), fmt(r.av), r.delta == null ? '–' : (r.delta > 0 ? '+' : '') + fmt(r.delta)].forEach(v => { tr.insertCell().textContent = v; });
+  }
+  box.replaceChildren(tb);
+}
+async function dbLoad(days) {
+  const c = dlgC, tok = ++dbTok; dbPts = null; dbSpan = 0; dbErr = '';
+  if (!c || !days) { $('#dtab').hidden = true; return dlgUp(); }
+  const to = Date.now(), from = to - days * 864e5, k = encodeURIComponent(c.id);
+  try {
+    const [h, d] = await Promise.all([
+      fetch(`/api/history?k=${k}&from=${from}&to=${to}`).then(r => r.json()),
+      fetch(`/api/daily?k=${k}&by=day&days=${days}`).then(r => r.json())]);
+    if (tok !== dbTok || dlgC !== c) return;
+    if (!h.ok) throw new Error(h.msg);
+    dbPts = h.data; dbSpan = days * 864e5; dbTable(d.ok ? d.data : []);
+    if (!dbPts.length) dbErr = 'ยังไม่มีข้อมูลในฐานข้อมูลช่วงนี้';
+  } catch { if (tok === dbTok) dbErr = 'อ่านข้อมูลย้อนหลังไม่สำเร็จ'; }
+  dlgUp();
+}
+function dlgUp() {
+  const c = dlgC; if (!c) return;
+  const hist = dbSpan && dbPts && dbPts.length ? dbPts : null;
+  $('#dv').textContent = fmt(c.last ? c.last.v : null); $('#dtr').textContent = c.trEl.textContent; $('#dtr').className = c.trEl.className;
+  let stat = c.stat;
+  if (hist) {
+    let lo = Infinity, hi = -Infinity, sum = 0;
+    for (const [, v] of hist) { sum += v; if (v < lo) lo = v; if (v > hi) hi = v; }
+    const d = hist[hist.length - 1][1] - hist[0][1];
+    stat = [fmt(lo), fmt(hi), fmt(sum / hist.length), (d > 0 ? '+' : '') + fmt(d)];
+    $('#dsl').textContent = 'สรุป ' + Math.round(dbSpan / 864e5) + ' วันล่าสุด (จากฐานข้อมูล · ค่าเฉลี่ยต่อช่วง)';
+  } else $('#dsl').textContent = dbErr || c.stl.textContent;
+  $('#dst').querySelectorAll('dd').forEach((d, i) => d.textContent = stat ? stat[i] : '–');
+  draw({ ...c, pts: hist || c.pts, rng: hist ? dbSpan : undefined, cv: $('#dcv'), hx: dhx });
+}
+{
+  const cv = $('#dcv'), mv = e => { dhx = e.clientX - cv.getBoundingClientRect().left; dlgUp(); };
+  cv.addEventListener('pointermove', mv); cv.addEventListener('pointerdown', mv);
+  cv.addEventListener('pointerleave', () => { dhx = null; dlgUp(); });
+  $('#dx').onclick = () => $('#dlg').close();
+  $('#dlg').onclick = e => { if (e.target === $('#dlg')) $('#dlg').close(); };
+  $('#dlg').onclose = () => { dlgC = null; dhx = null; dbTok++; dbPts = null; dbSpan = 0; };
+  $('#dsrc').onchange = e => dbLoad(+e.target.value);
+  addEventListener('resize', dlgUp);
+}
+
+// ---------- Datalog: ดู / ส่งออก CSV / ล้างข้อมูลที่บันทึกไว้ในฐานข้อมูล ----------
+const TITLES = new Set(DICT.map(d => d[1]));      // ค่าที่ระบบรู้จัก (ไฟฟ้า อุณหภูมิ น้ำ ฯลฯ) ถือเป็นค่าสำคัญ
+let lspan = 7, ltimer = 0, lmt = 0;
+const mk = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+const api = async (url, opt) => (await fetch(url, opt)).json();
+function lmsg(t) { $('#lmsg').textContent = t; clearTimeout(lmt); lmt = setTimeout(() => { $('#lmsg').textContent = ''; }, 5000); }
+async function logLoad() {
+  let j; try { j = await api('/api/log/summary?days=' + lspan); } catch { return lmsg('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); }
+  const on = j.on !== false, i = j.info || {};
+  if (on && !j.ok) {      // ฐานข้อมูลอ่านไม่ได้ (ล่ม/กำลังตื่น): แจ้งให้ชัด และคงตารางเดิมไว้ ไม่แสดงว่า "ไม่มีข้อมูล"
+    $('#loff').hidden = true; $('#lctl').hidden = false; $('#lflush').hidden = false;
+    $('#lerr').hidden = false; $('#lerr').textContent = '⚠️ อ่านข้อมูลจากฐานข้อมูลไม่สำเร็จ (' + (j.msg || 'ไม่ทราบสาเหตุ') + ') ตารางที่เห็นอาจไม่ใช่ข้อมูลล่าสุด ระบบจะลองใหม่อัตโนมัติ ข้อมูลที่เก็บไว้ไม่หาย';
+    return;
+  }
+  $('#loff').hidden = on; $('#lctl').hidden = !on; $('#lflush').hidden = !on;
+  $('#lsub').textContent = on ? `บันทึกรายนาทีอัตโนมัติตลอดเวลา · เก็บย้อนหลัง ${i.days} วัน` + (i.rollup ? ` (เก่ากว่า ${i.rollup} วันย่อเป็นรายชั่วโมง)` : '') + ` · เขียนลงฐานข้อมูลทุก ${i.flushMin} นาที`
+    + (i.lastOk ? ` · บันทึกล่าสุด ${hm(i.lastOk)}` : '') + (i.pending ? ` · รอเขียน ${i.pending} รายการ` : '') : '';
+  $('#lerr').hidden = !i.lastErr; $('#lerr').textContent = i.lastErr ? '⚠️ บันทึกลงฐานข้อมูลล่าสุดไม่สำเร็จ (ระบบจะลองใหม่เอง): ' + i.lastErr : '';
+  if (!on) return;
+  // ค่าเริ่มต้นแสดงทุกค่า (ค่าที่ระบบรู้จักขึ้นก่อน) ติ๊กช่องด้านบนเพื่อเหลือเฉพาะค่าสำคัญ
+  const rows = (j.data || []).slice(), isImp = r => TITLES.has(info(r.k, true).title);
+  rows.sort((a, b) => isImp(b) - isImp(a));
+  const shown = $('#lall').checked && rows.some(isImp) ? rows.filter(isImp) : rows, box = $('#ltab');
+  if (!shown.length) { box.replaceChildren(mk('p', `ยังไม่มีข้อมูลในช่วงนี้ ระบบเขียนลงฐานข้อมูลทุก ${i.flushMin} นาที กด "💾 บันทึกตอนนี้" เพื่อดูข้อมูลล่าสุดทันที`, 'hint')); return; }
+  const tb = mk('table', null, 'lt'), hr = tb.createTHead().insertRow();
+  ['ค่า', 'ล่าสุด', 'ต่ำสุด', 'สูงสุด', 'เฉลี่ย', 'ข้อมูลที่เก็บไว้', ''].forEach(h => hr.appendChild(mk('th', h)));
+  const body = tb.createTBody();
+  for (const r of shown) {
+    const f = info(r.k, true), tr = body.insertRow(), name = mk('td');
+    name.append(mk('b', f.title), mk('small', (f.eq ? f.eq + ' · ' : '') + topicOf(r.k)));
+    tr.appendChild(name);
+    [fmt(r.la) + (f.unit ? ' ' + f.unit : ''), fmt(r.mn), fmt(r.mx), fmt(r.av), `${r.n.toLocaleString('en-US')} นาที · ตั้งแต่ ${dm(r.t0)} ${hm(r.t0)}`].forEach(v => tr.insertCell().textContent = v);
+    const acs = mk('div', null, 'acs');
+    const bv = mk('button', '📈 กราฟ'); bv.type = 'button'; bv.onclick = () => logView(r.k);
+    const ex = mk('a', '⬇️ CSV', 'btn'); ex.href = `/api/log/export?k=${encodeURIComponent(r.k)}&days=${lspan}`;
+    const bd = mk('button', '🗑️'); bd.type = 'button'; bd.title = 'ล้างข้อมูลของค่านี้'; bd.setAttribute('aria-label', 'ล้างข้อมูลของค่านี้'); bd.onclick = () => logReset(r.k, f.title);
+    acs.append(bv, ex, bd); tr.insertCell().appendChild(acs);
+  }
+  box.replaceChildren(tb);
+}
+// การ์ดชั่วคราวสำหรับค่าที่มีแต่ในฐานข้อมูล (ไม่มีข้อมูลสดแล้ว) ใช้แสดงในหน้าต่างกราฟเท่านั้น ไม่เพิ่มการ์ดเปล่าลงหน้าหลัก
+function ghostCard(k) {
+  const f = info(k, true);
+  return { id: k, numeric: true, f, color: f.color, last: null, pts: [], stat: null, ghost: true, trEl: { textContent: '', className: 'tr' }, stl: { textContent: '' } };
+}
+function logView(k) {          // เปิดกราฟใหญ่ของค่านั้น พร้อมโหมดดูย้อนหลังจากฐานข้อมูล
+  const c = cards.get(k) || ghostCard(k), s = $('#dsrc'); $('#ldlg').close(); openDlg(c);
+  const d = [...s.options].some(o => +o.value === lspan) ? lspan : 7;
+  s.value = String(d); dbLoad(d);
+}
+async function logReset(k, title) {
+  if (k) { if (!confirm(`ล้างข้อมูลที่บันทึกไว้ของ "${title}" ?\nกู้คืนไม่ได้`)) return; }
+  else if (prompt('ล้างข้อมูลที่บันทึกไว้ของ "ทุกค่า" ทั้งหมด กู้คืนไม่ได้\nพิมพ์ RESET เพื่อยืนยัน') !== 'RESET') return;
+  try {
+    const j = await api('/api/log/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(k ? { k } : { all: true }) });
+    lmsg(j.msg || 'เรียบร้อย');
+  } catch { lmsg('ล้างไม่สำเร็จ: เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); }
+  logLoad();
+}
+$('#logb').onclick = () => { $('#ldlg').showModal(); logLoad(); clearInterval(ltimer); ltimer = setInterval(logLoad, 30000); };
+$('#ldlg').onclose = () => clearInterval(ltimer);
+$('#lx').onclick = () => $('#ldlg').close();
+$('#ldlg').onclick = e => { if (e.target === $('#ldlg')) $('#ldlg').close(); };
+$('#lspan').onchange = e => { lspan = +e.target.value; logLoad(); };
+$('#lall').onchange = logLoad;
+$('#lrall').onclick = () => logReset(null);
+$('#lflush').onclick = async e => {
+  const b = e.currentTarget; b.disabled = true;
+  try { lmsg((await api('/api/log/flush', { method: 'POST' })).msg || 'เรียบร้อย'); } catch { lmsg('บันทึกไม่สำเร็จ'); }
+  b.disabled = false; logLoad();
+};
+
+// ---------- ปุ่ม 📚 ข้อมูลย้อนหลัง: เลือกค่า + ช่วงเวลา ดูกราฟ/สรุปรายวัน-รายเดือนจากฐานข้อมูล ----------
+let hPts = [], hSpan = 7 * 864e5, hTok = 0, hHx = null;
+function hFill() {
+  const k = $('#hk'), keep = k.value, list = [...cards.values()].filter(c => c.numeric).sort((a, b) => a.id.localeCompare(b.id));
+  k.textContent = '';
+  for (const c of list) k.add(new Option(c.f.title + ' — ' + groupOf(c.id) + (groupOf(c.id) !== topicOf(c.id) ? ' · ' + topicOf(c.id) : ''), c.id));
+  if (keep && list.some(c => c.id === keep)) k.value = keep;
+  const r = $('#hr'), rk = r.value || '7'; r.textContent = '';
+  for (const [d, t] of DBOPTS) if (d && d <= (st.dbDays || 90)) r.add(new Option(t, d));
+  r.value = [...r.options].some(o => o.value === rk) ? rk : '7';
+  $('#hdays').textContent = st.dbDays || 90;
+  $('#hroll').textContent = st.dbRollup ? ` (ข้อมูลเก่ากว่า ${st.dbRollup} วันย่อเป็นรายชั่วโมง)` : '';
+}
+function hDraw() {
+  const c = cards.get($('#hk').value);
+  draw({ cv: $('#hcv'), pts: hPts, color: c ? c.color : '#0891b2', f: c ? c.f : { unit: '' }, rng: hSpan, hx: hHx });
+}
+function hTable(rows, by) {
+  const box = $('#htab'); box.hidden = !rows.length; if (!rows.length) return;
+  const tb = document.createElement('table');
+  tb.innerHTML = '<thead><tr><th></th><th>ต่ำสุด</th><th>สูงสุด</th><th>เฉลี่ย</th><th>เปลี่ยนไป</th></tr></thead>';
+  tb.tHead.rows[0].cells[0].textContent = by === 'month' ? 'เดือน' : 'วันที่';
+  const body = tb.createTBody();
+  for (const r of rows.slice().reverse()) {
+    const tr = body.insertRow();
+    [by === 'month' ? String(r.d).slice(0, 7) : r.d, fmt(r.mn), fmt(r.mx), fmt(r.av), r.delta == null ? '–' : (r.delta > 0 ? '+' : '') + fmt(r.delta)].forEach(v => { tr.insertCell().textContent = v; });
+  }
+  box.replaceChildren(tb);
+}
+async function hLoad() {
+  const k = $('#hk').value, days = +$('#hr').value || 7, by = $('#hb').value, tok = ++hTok;
+  hPts = []; hSpan = days * 864e5; $('#htab').hidden = true;
+  $('#hst').querySelectorAll('dd').forEach(d => { d.textContent = '–'; });
+  if (!k) { $('#hsl').textContent = 'ยังไม่มีค่าให้เลือก รอให้อุปกรณ์ส่งข้อมูลมาก่อน'; return hDraw(); }
+  $('#hsl').textContent = 'กำลังโหลด…'; hDraw();
+  const to = Date.now(), q = encodeURIComponent(k);
+  try {
+    const [h, d] = await Promise.all([api(`/api/history?k=${q}&from=${to - hSpan}&to=${to}`), api(`/api/daily?k=${q}&by=${by}&days=${days}`)]);
+    if (tok !== hTok) return;
+    if (!h.ok) throw new Error(h.msg);
+    hPts = h.data; hTable(d.ok ? d.data : [], by);
+  } catch { if (tok === hTok) { $('#hsl').textContent = 'อ่านข้อมูลย้อนหลังไม่สำเร็จ ลองใหม่อีกครั้ง'; hDraw(); } return; }
+  if (hPts.length) {
+    let lo = Infinity, hi = -Infinity, sum = 0;
+    for (const [, v] of hPts) { sum += v; if (v < lo) lo = v; if (v > hi) hi = v; }
+    const dd = hPts[hPts.length - 1][1] - hPts[0][1];
+    [fmt(lo), fmt(hi), fmt(sum / hPts.length), (dd > 0 ? '+' : '') + fmt(dd)].forEach((s, i) => { $('#hst').querySelectorAll('dd')[i].textContent = s; });
+    $('#hsl').textContent = `สรุป ${days} วันล่าสุด (จากฐานข้อมูล · ค่าเฉลี่ยต่อช่วง)`;
+  } else $('#hsl').textContent = `ยังไม่มีข้อมูลในฐานข้อมูลช่วงนี้ ระบบเขียนลงฐานข้อมูลทุก ${st.dbFlushMin || 15} นาที — เปิด 📒 Datalog แล้วกด "💾 บันทึกตอนนี้" เพื่อดูข้อมูลล่าสุดทันที`;
+  hDraw();
+}
+{
+  const cv = $('#hcv'), mv = e => { hHx = e.clientX - cv.getBoundingClientRect().left; hDraw(); };
+  cv.addEventListener('pointermove', mv); cv.addEventListener('pointerdown', mv);
+  cv.addEventListener('pointerleave', () => { hHx = null; hDraw(); });
+  $('#hbtn').onclick = () => { hFill(); $('#hdlg').showModal(); hLoad(); };
+  $('#hk').onchange = $('#hr').onchange = $('#hb').onchange = hLoad;
+  $('#hx').onclick = () => $('#hdlg').close();
+  $('#hdlg').onclick = e => { if (e.target === $('#hdlg')) $('#hdlg').close(); };
+  $('#hdlg').onclose = () => { hTok++; hHx = null; };
+  $('#hcsv').onclick = () => { const k = $('#hk').value; if (k) location.href = `/api/log/export?k=${encodeURIComponent(k)}&days=${+$('#hr').value || 7}`; };
+  addEventListener('resize', () => { if ($('#hdlg').open) hDraw(); });
+}
+
+// ---------- เทียบแรงดัน Grid / Solar ในกราฟเดียว + ค่าไฟต่อวัน ----------
+// ค่าไฟ = พลังงานสะสม (kWh) ที่เพิ่มขึ้นในแต่ละวัน × ราคาต่อหน่วย (แรงดันอย่างเดียวคิดเป็นเงินไม่ได้)
+const VT = 'แรงดันไฟฟ้า', ET = 'พลังงานไฟฟ้าที่ใช้สะสม';
+let cTok = 0, cSer = [], cSpan = 0, cHx = null, cBar = { list: [], mon: [], ge: null, se: null, msg: '' }, cHb = null;
+const baht = v => v == null || !isFinite(v) ? '–' : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const cPick = (grp, title) => [...cards.values()].filter(c => c.numeric && groupOf(c.id) === grp && c.f.title === title).sort((a, b) => a.id.localeCompare(b.id))[0] || null;
+let cEid = { g: '', s: '' }, cLast = null;
+const UNIT_OPT = [['auto', 'อัตโนมัติ (ตามชื่อค่า)'], ['1', 'kWh'], ['0.001', 'Wh (÷1000)'], ['0.1', '0.1 kWh ต่อหน่วย'], ['0.01', '0.01 kWh ต่อหน่วย'], ['1000', 'MWh (×1000)']];
+// ตัวคูณแปลงค่าสะสมเป็น kWh: ผู้ใช้เลือกหน่วยเองได้ (กันกรณีอุปกรณ์ส่งเป็น Wh / สเกลอื่น ทำให้ค่าไฟเพี้ยนเป็นพันเท่า)
+const kwhF = c => { if (!c) return 1; const ov = c.id === cEid.g ? $('#cug').value : c.id === cEid.s ? $('#cus').value : 'auto'; return ov && ov !== 'auto' ? +ov : /^wh$/i.test(c.f.unit) ? 1e-3 : 1; };
+const cEnergyCards = grp => [...cards.values()].filter(c => c.numeric && groupOf(c.id) === grp && (c.f.title === ET || /^k?wh$/i.test(c.f.unit || ''))).sort((a, b) => a.id.localeCompare(b.id));
+function cFillEnergy() {
+  [['#ceg', '#cg', 'cug'], ['#ces', '#cs', 'cus']].forEach(([id, gid, uid]) => {
+    const e = $(id), keep = e.value, list = cEnergyCards($(gid).value); e.textContent = '';
+    list.forEach(c => e.add(new Option((c.f.raw || c.f.title) + (c.f.unit ? ' (' + c.f.unit + ')' : ''), c.id)));
+    e.value = keep && list.some(c => c.id === keep) ? keep : (list[0] || { id: '' }).id;
+  });
+  [['#cug', 'cug'], ['#cus', 'cus']].forEach(([id, key]) => {
+    const e = $(id); if (e.options.length) return; UNIT_OPT.forEach(([v, t]) => e.add(new Option(t, v)));
+    try { e.value = localStorage.getItem(key) || 'auto'; } catch { e.value = 'auto'; }
+  });
+}
+let rate = 4.2; try { const r = parseFloat(localStorage.getItem('rate')); if (r >= 0) rate = r; } catch {}
+function cFill() {
+  const gs = [...new Set([...cards.values()].filter(c => c.numeric).map(c => groupOf(c.id)))].sort();
+  [['#cg', /grid/i, 0], ['#cs', /solar/i, 1]].forEach(([id, re, alt]) => {
+    const s = $(id), keep = s.value; s.textContent = '';
+    gs.forEach(x => s.add(new Option(x, x)));
+    s.value = keep && gs.includes(keep) ? keep : gs.find(x => re.test(x)) || gs[alt] || '';
+  });
+  const r = $('#cr'), rk = r.value; r.textContent = '';
+  for (const [d, t] of DBOPTS) if (!d || (st.db && d <= (st.dbDays || 90))) r.add(new Option(t, d));
+  r.value = rk && [...r.options].some(o => o.value === rk) ? rk : st.db ? '30' : '0';
+  $('#crate').value = rate; cFillEnergy();
+}
+async function cVolt(c, days) {
+  if (!c) return [];
+  if (!days) { const a = series.get(c.id) || [], s = rangeMs ? Date.now() - rangeMs : 0; return s ? a.filter(p => p[0] >= s) : a; }
+  const to = Date.now(), j = await api(`/api/history?k=${encodeURIComponent(c.id)}&from=${to - days * 864e5}&to=${to}`);
+  if (!j.ok) throw new Error(j.msg || 'อ่านฐานข้อมูลไม่สำเร็จ');
+  return j.data;
+}
+async function cDaily(c, days) {
+  if (!c) return [];
+  const j = await api(`/api/daily?k=${encodeURIComponent(c.id)}&by=day&days=${days}`);
+  if (!j.ok) throw new Error(j.msg || 'อ่านฐานข้อมูลไม่สำเร็จ');
+  return j.data;
+}
+const sumStat = a => { let lo = Infinity, hi = -Infinity, s = 0; for (const [, v] of a) { s += v; if (v < lo) lo = v; if (v > hi) hi = v; } return { lo, hi, av: s / a.length }; };
+async function cLoad() {
+  const tok = ++cTok, days = +$('#cr').value || 0, gG = $('#cg').value, sG = $('#cs').value;
+  const gv = cPick(gG, VT), sv = cPick(sG, VT), ge = cards.get($('#ceg').value) || cPick(gG, ET), se = cards.get($('#ces').value) || cPick(sG, ET);
+  cEid = { g: ge ? ge.id : '', s: se ? se.id : '' };
+  cSpan = days ? days * 864e5 : rangeMs; cSer = []; cBar = { list: [], mon: [], ge: null, se: null, msg: 'กำลังโหลด…' }; cBarDraw(); $('#ctab').replaceChildren(); $('#cnote').textContent = '';
+  $('#csl').textContent = 'กำลังโหลด…'; cDraw();
+  let gp = [], sp = [], dg = [], ds = [], eg = [], es = [];
+  try {
+    [gp, sp] = await Promise.all([cVolt(gv, days), cVolt(sv, days)]);
+    if (days && st.db) { [dg, ds] = await Promise.all([cDaily(ge, days), cDaily(se, days)]); [eg, es] = await Promise.all([cVolt(ge, days), cVolt(se, days)]); }
+  } catch (e) { if (tok === cTok) { $('#csl').textContent = 'อ่านข้อมูลย้อนหลังไม่สำเร็จ ลองใหม่อีกครั้ง'; cDraw(); } return; }
+  if (tok !== cTok) return;
+  cSer = [{ name: 'Grid · ' + (gG || '–'), pts: gp, color: '#22e1ff', lc: '#0891b2', has: !!gv }, { name: 'Solar · ' + (sG || '–'), pts: sp, color: '#ffc24b', lc: '#d98200', has: !!sv }];
+  // คำอธิบายสี + ตัวเลขสรุป
+  const lg = $('#cleg'); lg.replaceChildren();
+  const dark = document.documentElement.dataset.theme === 'dark';
+  const sd = $('#cst'); sd.replaceChildren();
+  for (const s of cSer) {
+    const e = mk('span'), i = mk('i'); i.style.background = dark ? s.color : s.lc;
+    e.append(i, s.name + (s.has ? '' : ' (ไม่พบค่าแรงดัน)')); lg.appendChild(e);
+    const m = s.pts.length ? sumStat(s.pts) : null;
+    for (const [l, v] of [[s.name.split(' · ')[0] + ' เฉลี่ย', m ? fmt(m.av) + ' V' : '–'], [s.name.split(' · ')[0] + ' ต่ำสุด–สูงสุด', m ? fmt(m.lo) + ' – ' + fmt(m.hi) : '–']]) {
+      const d = mk('div'); d.append(mk('dt', l), mk('dd', v)); sd.appendChild(d);
+    }
+  }
+  $('#csl').textContent = days ? `แรงดัน ${days} วันล่าสุด (จากฐานข้อมูล · ค่าเฉลี่ยต่อช่วง)` : 'แรงดันสด · ' + rangeTxt();
+  cDraw(); cLast = { days, ge, se, dg, ds, eg, es }; cCost(cLast);
+}
+// สรุปค่าไฟ: ต่อวัน / ประมาณการต่อเดือน (30 วัน) / ตารางรายวัน / ตารางรายเดือน — Grid ใช้ไป (ค่าไฟ) และ Solar ผลิตได้ (มูลค่าที่ประหยัด)
+function cCost({ days, ge, se, dg, ds, eg = [], es = [] }) {
+  const box = $('#ctab'), r = Math.max(0, rate) || 0, note = $('#cnote'), sum = $('#csum');
+  sum.replaceChildren(); cBar = { list: [], mon: [], ge, se, msg: '' }; cHb = null;
+  { const d = c => !c ? '–' : (c.f.raw || c.f.title) + ' · ล่าสุด ' + fmt(c.last ? c.last.v : null) + ' ' + (c.f.unit || '') + ' (×' + kwhF(c) + ' = kWh)'; $('#csrc').textContent = 'ใช้ค่า → Grid: ' + d(ge) + ' | Solar: ' + d(se); }
+  if (!ge && !se) { cBar.msg = 'ไม่พบค่าพลังงานสะสม (kWh) จึงยังทำกราฟค่าไฟไม่ได้'; cBarDraw(); box.replaceChildren(mk('p', 'ไม่พบค่าพลังงานสะสม (kWh) ของอุปกรณ์ที่เลือก จึงยังคิดค่าไฟไม่ได้ (ต้องมีค่าที่ชื่อมีคำว่า energy หรือ kWh)', 'hint')); return; }
+  const tile = (l, v) => { const d = mk('div'); d.append(mk('dt', l), mk('dd', v)); sum.appendChild(d); };
+  const table = (head, body, cls) => {
+    const tb = mk('table'), hr = tb.createTHead().insertRow(); head.forEach(h => hr.appendChild(mk('th', h)));
+    const bd = tb.createTBody(); for (const row of body) { const tr = bd.insertRow(); if (row.cls) tr.className = row.cls; row.c.forEach(v => tr.insertCell().textContent = v); } return tb;
+  };
+  const kb = (kwh) => kwh == null ? '–' : baht(kwh * r);
+  const out = [];
+  if (days && st.db) {
+    const rows = new Map();
+    let skip = 0; const dv = (x, c) => x.delta == null ? null : x.delta < 0 ? (skip++, null) : x.delta * kwhF(c);
+    for (const x of dg) rows.set(x.d, { d: x.d, g: dv(x, ge), s: null });
+    for (const x of ds) { const o = rows.get(x.d) || rows.set(x.d, { d: x.d, g: null, s: null }).get(x.d); o.s = dv(x, se); }
+    const list = [...rows.values()].sort((a, b) => String(a.d).localeCompare(String(b.d)));
+    // ค่าเฉลี่ยต่อวัน: ตัดวันแรก (ไม่รู้ค่าเริ่มต้นของวัน) กับวันนี้ (ยังไม่จบวัน) ออก ถ้ามีข้อมูลพอ
+    const full = list.length >= 3 ? list.slice(1, -1) : [];
+    const avg = k => { const v = full.map(x => x[k]).filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+    const nn = k => full.filter(x => x[k] != null && isFinite(x[k])).length;
+    // ถ้ามีวันเต็มไม่ถึง 3 วัน: ประมาณจากอัตราเฉลี่ยตลอดช่วงเวลาที่มีข้อมูลจริง (ค่าสะสมต่างกันเท่าไร ÷ เวลาที่ผ่านไป × 24 ชม.)
+    const est = (pts, c) => { if (pts.length < 2) return null; const dt = pts[pts.length - 1][0] - pts[0][0], dv = (pts[pts.length - 1][1] - pts[0][1]) * kwhF(c); return dt >= 6 * 36e5 && dv >= 0 ? { v: dv / dt * 864e5, h: dt / 36e5 } : null; };
+    const eG = nn('g') < 3 ? est(eg, ge) : null, eS = nn('s') < 3 ? est(es, se) : null;
+    const ag = eG ? eG.v : avg('g'), as = eS ? eS.v : avg('s');
+    const tag = k => { const e = k === 'g' ? eG : eS; if (e) return ` (ประมาณจากข้อมูล ${e.h < 48 ? Math.round(e.h) + ' ชม.' : (e.h / 24).toFixed(1) + ' วัน'} · ยังไม่แม่น)`; const n = nn(k); return n ? ` (จาก ${n} วันเต็ม${n < 7 ? ' · ยังไม่แม่น' : ''})` : ' (ยังไม่มีข้อมูลพอ)'; };
+    if (ge) { tile('ค่าไฟ Grid เฉลี่ยต่อวัน' + tag('g'), kb(ag) + ' บาท'); tile('ประมาณการต่อเดือน (30 วัน)' + tag('g'), ag == null ? '–' : baht(ag * 30 * r) + ' บาท'); }
+    if (se) { tile('Solar ประหยัดเฉลี่ยต่อวัน' + tag('s'), kb(as) + ' บาท'); tile('Solar ประหยัดต่อเดือน (30 วัน)' + tag('s'), as == null ? '–' : baht(as * 30 * r) + ' บาท'); }
+    let tg = 0, ts = 0, ng = 0, ns = 0;
+    const body = list.slice().reverse().map(x => { if (x.g != null) { tg += x.g; ng++; } if (x.s != null) { ts += x.s; ns++; }
+      return { c: [x.d, x.g == null ? '–' : fmt(x.g), kb(x.g), x.s == null ? '–' : fmt(x.s), kb(x.s)] }; });
+    if (list.length > 1) { body.push({ cls: 'sum', c: ['รวม', ng ? fmt(tg) : '–', ng ? kb(tg) : '–', ns ? fmt(ts) : '–', ns ? kb(ts) : '–'] }); }
+    const mon = new Map();
+    for (const x of list) { const k = String(x.d).slice(0, 7), o = mon.get(k) || mon.set(k, { k, n: 0, g: 0, s: 0, hg: false, hs: false }).get(k);
+      o.n++; if (x.g != null) { o.g += x.g; o.hg = true; } if (x.s != null) { o.s += x.s; o.hs = true; } }
+    const mname = k => { const [y, m] = k.split('-'); try { return new Date(+y, +m - 1, 1).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }); } catch { return k; } };
+    if (skip) $('#csrc').textContent += ` · ข้าม ${skip} วันที่ค่าสะสมลดลง (เคาน์เตอร์รีเซ็ต)`;
+    cBar.list = list; cBar.mon = [...mon.values()].sort((a, b) => a.k.localeCompare(b.k)); cBarDraw();
+    const mbody = [...mon.values()].sort((a, b) => b.k.localeCompare(a.k)).map(o => ({ c: [mname(o.k), o.n + ' วัน', o.hg ? fmt(o.g) : '–', o.hg ? kb(o.g) : '–', o.hs ? fmt(o.s) : '–', o.hs ? kb(o.s) : '–'] }));
+    out.push(mk('h3', 'รายเดือน (ตามเดือนปฏิทิน)'), table(['เดือน', 'ข้อมูล', 'Grid ใช้ (kWh)', 'ค่าไฟ Grid (บาท)', 'Solar ผลิต (kWh)', 'มูลค่า Solar (บาท)'], mbody),
+      mk('h3', 'รายวัน'), table(['วันที่', 'Grid ใช้ (kWh)', 'ค่าไฟ Grid (บาท)', 'Solar ผลิต (kWh)', 'มูลค่า Solar (บาท)'], body));
+    note.textContent = 'ประมาณการจากพลังงานสะสม × ราคาที่ตั้ง ยังไม่รวมค่าบริการ/Ft/VAT · เดือนแรกและเดือนนี้เป็นยอดบางส่วน (ดูจำนวนวันที่มีข้อมูล) · ต่อเดือน = เฉลี่ยต่อวัน × 30 · ใช้ได้เมื่อค่าสะสมไม่ถูกรีเซ็ตกลางทาง · เก็บย้อนหลังได้ตาม LOG_DAYS (ปกติ 90 วัน)';
+  } else {
+    cBar.msg = st.db ? 'เลือกช่วง 7 วัน / 30 วัน / 90 วัน ด้านบน เพื่อดูกราฟค่าไฟรายวันจากข้อมูลที่บันทึกไว้' : 'ต้องตั้ง DATABASE_URL (ฐานข้อมูล) ก่อน จึงจะมีกราฟค่าไฟรายวัน/รายเดือนย้อนหลัง'; cBarDraw();
+    const liveK = c => { if (!c) return null; const a = (series.get(c.id) || []).filter(p => !rangeMs || p[0] >= Date.now() - rangeMs); return a.length > 1 ? { kwh: (a[a.length - 1][1] - a[0][1]) * kwhF(c), ms: a[a.length - 1][0] - a[0][0] } : null; };
+    const g = liveK(ge), s = liveK(se), per = x => x && x.ms >= 600e3 ? x.kwh / x.ms * 864e5 : null;
+    if (ge) { tile('ค่าไฟ Grid ในช่วงที่เลือก', g ? kb(g.kwh) + ' บาท' : '–'); tile('ประมาณการต่อวัน', per(g) == null ? '–' : baht(per(g) * r) + ' บาท'); tile('ประมาณการต่อเดือน (30 วัน)', per(g) == null ? '–' : baht(per(g) * 30 * r) + ' บาท'); }
+    if (se) { tile('Solar ผลิตในช่วงที่เลือก', s ? kb(s.kwh) + ' บาท' : '–'); tile('Solar ประมาณการต่อวัน', per(s) == null ? '–' : baht(per(s) * r) + ' บาท'); tile('Solar ประมาณการต่อเดือน', per(s) == null ? '–' : baht(per(s) * 30 * r) + ' บาท'); }
+    out.push(table(['ช่วง', 'Grid ใช้ (kWh)', 'ค่าไฟ Grid (บาท)', 'Solar ผลิต (kWh)', 'มูลค่า Solar (บาท)'], [{ c: [rangeTxt(), g ? fmt(g.kwh) : '–', g ? kb(g.kwh) : '–', s ? fmt(s.kwh) : '–', s ? kb(s.kwh) : '–'] }]));
+    note.textContent = (st.db ? 'ประมาณการจากช่วงข้อมูลสดที่เลือก (ยิ่งช่วงนานยิ่งแม่น เลือกช่วง 7/30 วันเพื่อดูจริงรายวัน/รายเดือน)' : 'ยังไม่ได้ตั้ง DATABASE_URL จึงเห็นเฉพาะประมาณการจากข้อมูลสด (ตั้งฐานข้อมูลเพื่อดูรายวัน/รายเดือนย้อนหลังจริง)') + ' · ต่อเดือน = ต่อวัน × 30 · ยังไม่รวมค่าบริการ/Ft/VAT';
+  }
+  box.replaceChildren(...out);
+}
+// ---------- Solar panel: เทียบกระแส 2 ค่าในกราฟเดียว ----------
+let sTok = 0, sSer = [], sSpan = 0, sHx = null;
+const S_COL = [['#22e1ff', '#0891b2'], ['#ffc24b', '#d98200'], ['#c4a1ff', '#7c3aed']];
+const sCards = grp => [...cards.values()].filter(c => c.numeric && groupOf(c.id) === grp).sort((a, b) => a.id.localeCompare(b.id));
+const sName = c => c.f.title + (c.f.raw && c.f.raw !== c.f.title ? ' · ' + c.f.raw : '');
+function sFillSeries() {
+  const list = sCards($('#sg').value), cur = list.filter(c => c.f.title === 'กระแสไฟฟ้า' || /^a$/i.test(c.f.unit || ''));
+  const pref = cur.length >= 2 ? cur : list;
+  [['#sa', 0], ['#sb', 1]].forEach(([id, i]) => {
+    const e = $(id), keep = e.value; e.textContent = '';
+    list.forEach(c => e.add(new Option(sName(c), c.id)));
+    e.value = keep && list.some(c => c.id === keep) ? keep : (pref[i] || list[i] || list[0] || { id: '' }).id;
+  });
+}
+function sFill() {
+  const gs = [...new Set([...cards.values()].filter(c => c.numeric).map(c => groupOf(c.id)))].sort(), g = $('#sg'), keep = g.value; g.textContent = '';
+  gs.forEach(x => g.add(new Option(x, x))); g.value = keep && gs.includes(keep) ? keep : gs.find(x => /solar|pv|โซลาร์/i.test(x)) || gs[0] || '';
+  sFillSeries();
+  const r = $('#sr'), rk = r.value; r.textContent = '';
+  for (const [d, t] of DBOPTS) if (!d || (st.db && d <= (st.dbDays || 90))) r.add(new Option(t, d));
+  r.value = rk && [...r.options].some(o => o.value === rk) ? rk : '0';
+}
+// รวมสองเส้นที่เวลาไม่ตรงกัน: เดินตามเวลา แล้วใช้ค่าล่าสุดของอีกเส้น (เริ่มเมื่อมีครบทั้งคู่)
+function sSum(a, b) {
+  const all = [...a.map(p => [p[0], 0, p[1]]), ...b.map(p => [p[0], 1, p[1]])].sort((x, y) => x[0] - y[0]), v = [null, null], out = [];
+  for (const [t, i, x] of all) { v[i] = x; if (v[0] != null && v[1] != null) out.push([t, v[0] + v[1]]); }
+  return out;
+}
+async function sLoad() {
+  const tok = ++sTok, days = +$('#sr').value || 0, ca = cards.get($('#sa').value), cb = cards.get($('#sb').value);
+  sSpan = days ? days * 864e5 : rangeMs; sSer = []; $('#sst').replaceChildren(); $('#snote').textContent = ''; $('#sleg').replaceChildren();
+  if (!ca || !cb) { $('#ssl').textContent = 'ยังไม่พบค่าให้เลือก รอให้อุปกรณ์ส่งข้อมูลมาก่อน'; sDraw(); return; }
+  $('#ssl').textContent = 'กำลังโหลด…'; sDraw();
+  let pa, pb;
+  try { [pa, pb] = await Promise.all([cVolt(ca, days), cVolt(cb, days)]); }
+  catch (e) { if (tok === sTok) { $('#ssl').textContent = 'อ่านข้อมูลย้อนหลังไม่สำเร็จ ลองใหม่อีกครั้ง'; sDraw(); } return; }
+  if (tok !== sTok) return;
+  const u = c => c.f.unit || 'A', nm = c => c.f.raw && c.f.raw !== c.f.title ? c.f.raw : c.f.title;
+  sSer = [{ name: nm(ca), pts: pa, c: S_COL[0], unit: u(ca) }, { name: nm(cb), pts: pb, c: S_COL[1], unit: u(cb) }];
+  if (ca.id === cb.id) $('#snote').textContent = 'เลือกค่าที่ 1 และ 2 เป็นค่าเดียวกัน — เลือกให้ต่างกันเพื่อเทียบ';
+  if ($('#ssum').checked && u(ca) === u(cb)) sSer.push({ name: 'รวม 1+2', pts: sSum(pa, pb), c: S_COL[2], unit: u(ca), thin: true });
+  const dark = document.documentElement.dataset.theme === 'dark', lg = $('#sleg'), sd = $('#sst');
+  for (const x of sSer) {
+    const e = mk('span'), i = mk('i'); i.style.background = dark ? x.c[0] : x.c[1]; e.append(i, x.name + (x.pts.length ? '' : ' (ไม่มีข้อมูลในช่วงนี้)')); lg.appendChild(e);
+    const m = x.pts.length ? sumStat(x.pts) : null, d1 = mk('div'), d2 = mk('div');
+    d1.append(mk('dt', x.name + ' เฉลี่ย'), mk('dd', m ? fmt(m.av) + ' ' + x.unit : '–')); d2.append(mk('dt', x.name + ' ต่ำสุด–สูงสุด'), mk('dd', m ? fmt(m.lo) + ' – ' + fmt(m.hi) : '–')); sd.append(d1, d2);
+  }
+  const A = sSer[0].pts.length ? sumStat(sSer[0].pts) : null, B = sSer[1].pts.length ? sumStat(sSer[1].pts) : null;
+  if (A && B) { const df = A.av - B.av, hi = Math.max(A.av, B.av), d = mk('div'); d.append(mk('dt', 'ค่าเฉลี่ยต่างกัน'), mk('dd', (df > 0 ? '+' : '') + fmt(df) + ' ' + sSer[0].unit + (hi ? ' (' + Math.abs(df / hi * 100).toFixed(0) + '%)' : ''))); sd.appendChild(d); }
+  $('#ssl').textContent = days ? `กระแส ${days} วันล่าสุด (จากฐานข้อมูล · ค่าเฉลี่ยต่อช่วง)` : 'กระแสสด · ' + rangeTxt();
+  sDraw();
+}
+function sDraw() {
+  const cv = $('#scv'), k = wCanvas(cv); if (!k) return;
+  const { g, w, h } = k, dark = document.documentElement.dataset.theme === 'dark', live = sSer.filter(x => x.pts.length);
+  if (!live.length) { g.fillStyle = k.mute; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(sSer.length ? 'ยังไม่มีข้อมูลกระแสในช่วงเวลานี้' : '', 12, h / 2); return; }
+  const R = 10, T = 10, B = 22, ph = h - T - B, col = x => dark ? x.c[0] : x.c[1];
+  let lo = Infinity, hi = -Infinity; for (const x of live) for (const p of x.pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
+  lo = Math.min(lo, 0) === 0 && lo >= 0 && hi > 0 && lo < hi * .5 ? 0 : lo;      // กระแสเริ่มที่ 0 ถ้าค่าต่ำสุดใกล้ศูนย์ จะได้เห็นสัดส่วนจริง
+  if (lo === hi) { const d = Math.abs(lo) * .05 || 1; lo -= d; hi += d; } else { const d = (hi - lo) * .08; if (lo !== 0) lo -= d; hi += d; }
+  const ya = yAxis(g, lo, hi, ph), L = ya.L, pw = w - L - R;
+  const t1 = Math.max(Date.now(), ...live.map(x => x.pts[x.pts.length - 1][0])), t0 = sSpan ? t1 - sSpan : Math.min(...live.map(x => x.pts[0][0]));
+  const X = t => L + (t1 === t0 ? pw : (t - t0) / (t1 - t0) * pw), Y = v => T + (1 - (v - lo) / (hi - lo)) * ph, long = t1 - t0 > 36 * 3600e3;
+  drawAxes(g, { w, h, L, R, T, pw, ph, ya, t0, t1, X, Y, mute: k.mute, ink: k.ink, grid: k.grid });
+  for (const x of live) {
+    strokeSegs(g, segs(x.pts, t1 - t0), X, Y, T + ph, col(x), { fill: false, T, dark, lw: x.thin ? 1.6 : 2.3 });
+    const lp = x.pts[x.pts.length - 1]; g.fillStyle = k.card; g.strokeStyle = col(x); g.lineWidth = 3; g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 4, 0, 7); g.fill(); g.stroke();
+  }
+  if (sHx != null) {
+    const hit = live.map(x => { let best = x.pts[0], bd = Infinity; for (const p of x.pts) { const d = Math.abs(X(p[0]) - sHx); if (d < bd) { bd = d; best = p; } } return { x, p: best }; });
+    const px = X(hit[0].p[0]); g.strokeStyle = k.mute; g.lineWidth = 1; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(px, T); g.lineTo(px, T + ph); g.stroke(); g.setLineDash([]);
+    for (const { x, p } of hit) { g.fillStyle = col(x); g.beginPath(); g.arc(X(p[0]), Y(p[1]), 4.5, 0, 7); g.fill(); }
+    g.textBaseline = 'middle'; wTip(k, px, [(long ? dm(hit[0].p[0]) + ' ' : '') + hms(hit[0].p[0]), ...hit.map(({ x, p }) => x.name + '  ' + fmt(p[1]) + ' ' + x.unit)], T);
+  }
+}
+// กราฟแท่งค่าไฟ: รายวัน/รายเดือน · Grid ใช้ไป (+ Solar ผลิตได้ ถ้ามี) · หน่วยบาท หรือ kWh
+function cBarItems() {
+  const mode = $('#cbm').value, today = (() => { const d = new Date(); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); })();
+  if (mode === 'd') {
+    const L = cBar.list; return L.map((x, i) => ({ lab: String(x.d).slice(8, 10) + '/' + String(x.d).slice(5, 7), full: String(x.d), g: x.g, s: x.s, part: i === 0 && L.length > 3 || String(x.d) === today }));
+  }
+  const nm = k => { const [y, m] = k.split('-'); try { return new Date(+y, +m - 1, 1).toLocaleDateString('th-TH', { month: 'short', year: '2-digit' }); } catch { return k; } };
+  return cBar.mon.map((o, i, a) => { const [y, m] = o.k.split('-'); return { lab: nm(o.k), full: nm(o.k) + ' (' + o.n + ' วัน)', g: o.hg ? o.g : null, s: o.hs ? o.s : null, part: o.n < new Date(+y, +m, 0).getDate() }; });
+}
+function cBarDraw() {
+  const cv = $('#ccb'); if (!cv) return;
+  const k = wCanvas(cv); if (!k) return;
+  const { g, w, h } = k, dark = document.documentElement.dataset.theme === 'dark', r = Math.max(0, rate) || 0, unitB = $('#cbu').value === 'b';
+  const items = cBarItems(), mode = $('#cbm').value, lg = $('#cbl'), sl = $('#cbs');
+  const cg = dark ? '#22e1ff' : '#0891b2', cs = dark ? '#ffc24b' : '#d98200', hasG = !!cBar.ge, hasS = !!cBar.se;
+  lg.replaceChildren();
+  if (hasG) { const e = mk('span'), i = mk('i'); i.style.background = cg; e.append(i, 'Grid ใช้ไป (ค่าไฟ)'); lg.appendChild(e); }
+  if (hasS) { const e = mk('span'), i = mk('i'); i.style.background = cs; e.append(i, 'Solar ผลิตได้ (ประหยัดไป)'); lg.appendChild(e); }
+  $('#cbt').textContent = mode === 'd' ? 'ใช้ไฟรายวัน' : 'ใช้ไฟรายเดือน';
+  const R = 10, T = 12, B = 24, ph = h - T - B, val = v => v == null ? null : unitB ? v * r : v, unit = unitB ? 'บาท' : 'kWh';
+  if (!items.length) { g.fillStyle = k.mute; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(cBar.msg || 'ยังไม่มีข้อมูล', 12, h / 2); sl.textContent = ''; return; }
+  const ser = [hasG && ['g', cg, 'Grid'], hasS && ['s', cs, 'Solar']].filter(Boolean);
+  let mx = 0; for (const it of items) for (const [key] of ser) { const v = val(it[key]); if (v != null && v > mx) mx = v; }
+  mx = (mx || 1) * 1.08;
+  const ya = yAxis(g, 0, mx, ph), L = ya.L, pw = w - L - R, Y = v => T + (1 - v / mx) * ph, n = items.length, bw = pw / n;
+  g.lineWidth = 1; g.strokeStyle = k.grid; g.fillStyle = k.mute; g.textAlign = 'right'; g.textBaseline = 'middle';
+  ya.ticks.forEach((v, i) => { const y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.fillText(ya.lab[i], L - 6, y); });
+  // ค่าเฉลี่ยต่อวันของ Grid (ไม่นับวันแรก/วันนี้ที่ข้อมูลไม่ครบ)
+  const full = items.filter(x => !x.part && x.g != null), avg = full.length ? full.reduce((a, x) => a + val(x.g), 0) / full.length : null;
+  const gw = Math.min(bw * .8, 34 * ser.length), sw = gw / ser.length;
+  items.forEach((it, i) => {
+    const x0 = L + i * bw + (bw - gw) / 2;
+    ser.forEach(([key, col], j) => {
+      const v = val(it[key]); if (v == null) return;
+      g.globalAlpha = (cHb === i ? 1 : .88) * (it.part ? .45 : 1); g.fillStyle = col;
+      const y = Y(v), bh = Math.max(1, T + ph - y), bx = x0 + j * sw + (ser.length > 1 ? .5 : 0), ww = Math.max(1, sw - (ser.length > 1 ? 1 : 0));
+      g.beginPath(); g.roundRect ? g.roundRect(bx, y, ww, bh, [Math.min(3, ww / 2), Math.min(3, ww / 2), 0, 0]) : g.rect(bx, y, ww, bh); g.fill();
+    });
+  });
+  g.globalAlpha = 1;
+  if (mode === 'd' && hasG && avg != null) {
+    const y = Math.round(Y(avg)) + .5; g.save(); g.setLineDash([5, 4]); g.strokeStyle = k.ink; g.globalAlpha = .55; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.restore();
+  }
+  g.fillStyle = k.mute; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(pw / (mode === 'd' ? 40 : 64)))));
+  let edge = w + 99;   // วาดจากขวาไปซ้าย ข้ามป้ายที่ทับกัน
+  for (let i = n - 1; i >= 0; i -= every) { const tw = g.measureText(items[i].lab).width, cx = Math.min(Math.max(L + i * bw + bw / 2, L + tw / 2), w - R - tw / 2); if (cx + tw / 2 > edge - 8) continue; g.fillText(items[i].lab, cx, h - 10); edge = cx - tw / 2; }
+  if (cHb != null && items[cHb]) {
+    const it = items[cHb], lines = [it.full + (it.part && mode === 'd' ? ' (ข้อมูลไม่ครบวัน)' : it.part ? ' (ข้อมูลไม่ครบเดือน)' : '')];
+    if (hasG) lines.push('Grid  ' + (it.g == null ? '–' : fmt(it.g) + ' kWh · ' + baht(it.g * r) + ' บาท'));
+    if (hasS) lines.push('Solar  ' + (it.s == null ? '–' : fmt(it.s) + ' kWh · ' + baht(it.s * r) + ' บาท'));
+    g.textBaseline = 'middle'; wTip(k, L + cHb * bw + bw / 2, lines, T);
+  }
+  const tg = items.reduce((a, x) => a + (x.g || 0), 0), cnt = items.filter(x => x.g != null).length;
+  sl.textContent = hasG && cnt ? `รวม Grid ${fmt(tg)} kWh ≈ ${baht(tg * r)} บาท (${cnt} ${mode === 'd' ? 'วัน' : 'เดือน'})` + (mode === 'd' && avg != null ? ` · เฉลี่ย ${yFmt(avg, 2)} ${unit}/วัน (เส้นประ)` : '') + ` · คิดที่ ${r} บาท/หน่วย · แท่งจางคือช่วงที่ข้อมูลไม่ครบ (วันแรก/วันนี้/เดือนที่ยังไม่จบ)` : '';
+}
+function cDraw() {
+  const cv = $('#ccv'), ser = cSer, dark = document.documentElement.dataset.theme === 'dark';
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1; if (!w) return;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement), gridC = css.getPropertyValue('--grid'), mute = css.getPropertyValue('--mute'), ink = css.getPropertyValue('--ink'), card = css.getPropertyValue('--card');
+  g.font = '12px Sarabun, system-ui, sans-serif'; g.textBaseline = 'middle';
+  let L = 50; const R = 10, T = 10, B = 22, ph = h - T - B, live = ser.filter(s => s.pts.length);
+  if (!live.length) { g.fillStyle = mute; g.textAlign = 'left'; g.fillText('ยังไม่มีข้อมูลแรงดันในช่วงเวลานี้', L, h / 2); return; }
+  let lo = Infinity, hi = -Infinity;
+  for (const s of live) for (const p of s.pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
+  if (lo === hi) { const d = Math.abs(lo) * .05 || 1; lo -= d; hi += d; } else { const d = (hi - lo) * .1; lo -= d; hi += d; }
+  const ya = yAxis(g, lo, hi, ph); L = ya.L; const pw = w - L - R;
+  const t1 = Math.max(Date.now(), ...live.map(s => s.pts[s.pts.length - 1][0])), t0 = cSpan ? t1 - cSpan : Math.min(...live.map(s => s.pts[0][0]));
+  const X = t => L + (t1 === t0 ? pw : (t - t0) / (t1 - t0) * pw), Y = v => T + (1 - (v - lo) / (hi - lo)) * ph;
+  const dec = hi - lo >= 100 ? 0 : hi - lo >= 10 ? 1 : hi - lo >= 1 ? 2 : 3, long = t1 - t0 > 36 * 3600e3;
+  drawAxes(g, { w, h, L, R, T, pw, ph, ya, t0, t1, X, Y, mute, ink, grid: gridC });
+  const col = s => dark ? lite(s.color, .2) : s.lc;
+  for (const s of live) {
+    strokeSegs(g, segs(s.pts, t1 - t0), X, Y, T + ph, col(s), { fill: false, T, dark, lw: 2.3 }); g.strokeStyle = col(s);
+    const lp = s.pts[s.pts.length - 1]; g.fillStyle = card; g.lineWidth = 3; g.beginPath(); g.arc(X(lp[0]), Y(lp[1]), 4, 0, 7); g.fill(); g.stroke();
+  }
+  if (cHx != null) {
+    const hit = live.map(s => { let best = s.pts[0], bd = Infinity; for (const p of s.pts) { const d = Math.abs(X(p[0]) - cHx); if (d < bd) { bd = d; best = p; } } return { s, p: best }; });
+    const x = X(hit[0].p[0]);
+    g.strokeStyle = mute; g.lineWidth = 1; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.setLineDash([]);
+    for (const { s, p } of hit) { g.fillStyle = col(s); g.beginPath(); g.arc(X(p[0]), Y(p[1]), 4.5, 0, 7); g.fill(); }
+    const lines = [(long ? dm(hit[0].p[0]) + ' ' : '') + hms(hit[0].p[0]), ...hit.map(({ s, p }) => s.name.split(' · ')[0] + '  ' + fmt(p[1]) + ' V')];
+    const tw = Math.max(...lines.map(l => g.measureText(l).width)) + 16, th = lines.length * 18 + 8;
+    const bx = Math.min(Math.max(x - tw / 2, L), w - R - tw), by = T + 4;
+    g.fillStyle = ink; g.beginPath(); g.roundRect ? g.roundRect(bx, by, tw, th, 6) : g.rect(bx, by, tw, th); g.fill();
+    g.fillStyle = card; g.textAlign = 'left'; lines.forEach((l, i) => g.fillText(l, bx + 8, by + 13 + i * 18));
+  }
+}
+{
+  const cv = $('#ccv'), mv = e => { cHx = e.clientX - cv.getBoundingClientRect().left; cDraw(); };
+  cv.addEventListener('pointermove', mv); cv.addEventListener('pointerdown', mv);
+  cv.addEventListener('pointerleave', () => { cHx = null; cDraw(); });
+  $('#cmpb').onclick = () => { cFill(); $('#cdlg').showModal(); cLoad(); };
+  $('#cg').onchange = $('#cs').onchange = () => { cFillEnergy(); cLoad(); };
+  $('#cr').onchange = $('#ceg').onchange = $('#ces').onchange = cLoad;
+  $('#cug').onchange = $('#cus').onchange = e => { try { localStorage.setItem(e.target.id, e.target.value); } catch {} if (cLast) cCost(cLast); };
+  $('#cbm').onchange = $('#cbu').onchange = () => { cHb = null; cBarDraw(); };
+  { const b = $('#ccb'), mb = e => { const L = 56, n = cBarItems().length, x = e.clientX - b.getBoundingClientRect().left - L; cHb = n && x >= 0 ? Math.min(n - 1, Math.floor(x / ((b.clientWidth - L - 10) / n))) : null; cBarDraw(); };
+    b.addEventListener('pointermove', mb); b.addEventListener('pointerdown', mb); b.addEventListener('pointerleave', () => { cHb = null; cBarDraw(); }); }
+  $('#crate').oninput = e => { const v = parseFloat(e.target.value); rate = v >= 0 ? v : 0; try { localStorage.setItem('rate', rate); } catch {} if (cSer.length) cLoad(); };
+  $('#cx').onclick = () => $('#cdlg').close();
+  $('#slb').onclick = () => { sFill(); $('#sdlg').showModal(); sLoad(); };
+  $('#sg').onchange = () => { sFillSeries(); sLoad(); };
+  $('#sa').onchange = $('#sb').onchange = $('#sr').onchange = $('#ssum').onchange = sLoad;
+  { const cv = $('#scv'), mv = e => { sHx = e.clientX - cv.getBoundingClientRect().left; sDraw(); };
+    cv.addEventListener('pointermove', mv); cv.addEventListener('pointerdown', mv); cv.addEventListener('pointerleave', () => { sHx = null; sDraw(); }); }
+  $('#sx').onclick = () => $('#sdlg').close();
+  $('#sdlg').onclick = e => { if (e.target === $('#sdlg')) $('#sdlg').close(); };
+  $('#sdlg').onclose = () => { sTok++; sHx = null; };
+  addEventListener('resize', () => { if ($('#sdlg').open) sDraw(); });
+  $('#cdlg').onclick = e => { if (e.target === $('#cdlg')) $('#cdlg').close(); };
+  $('#cdlg').onclose = () => { cTok++; cHx = null; cHb = null; };
+  addEventListener('resize', () => { if ($('#cdlg').open) { cDraw(); cBarDraw(); } });
+}
+
+// ---------- น้ำ: กราฟมิเตอร์ + ใช้ไปวันนี้ (หน่วย/บาท) ----------
+// สมมติว่าค่าน้ำเป็นมิเตอร์สะสม (m³) ถ้าเป็นอัตราการไหลจะคิดผิด; เลือกหน่วย "ลิตร" ได้ถ้ามิเตอร์ส่งเป็นลิตร
+let wTok = 0, wSer = [], wBars = [], wSpan = 0, wHx = null, wHb = null, wMsg = '', wTimer = 0;
+let wrate = 15; try { const r = parseFloat(localStorage.getItem('wrate')); if (r >= 0) wrate = r; } catch {}
+const wf = () => $('#wu').value === 'l' ? 1e-3 : 1;
+const wDark = () => document.documentElement.dataset.theme === 'dark';
+const wCard = () => cards.get($('#wk').value) || null;
+function wFill() {
+  const list = [...cards.values()].filter(c => c.numeric).sort((a, b) => a.id.localeCompare(b.id));
+  const s = $('#wk'), keep = s.value; s.textContent = '';
+  list.forEach(c => s.add(new Option(c.f.title + ' — ' + groupOf(c.id) + (groupOf(c.id) !== topicOf(c.id) ? ' · ' + topicOf(c.id) : ''), c.id)));
+  const guess = list.find(c => /water|น้ำ|meter/i.test(c.id + ' ' + c.f.title));
+  s.value = keep && list.some(c => c.id === keep) ? keep : guess ? guess.id : list[0] ? list[0].id : '';
+  try { const u = localStorage.getItem('wunit'); if (u) $('#wu').value = u; } catch {}
+  const c = wCard(); if (c && /^(l|lit(er|re)s?|ลิตร)$/i.test(c.f.unit || '') && !localStorage.getItem('wunit')) $('#wu').value = 'l';
+  const r = $('#wr'), rk = r.value; r.textContent = '';
+  for (const [d, t] of DBOPTS) if (!d || (st.db && d <= (st.dbDays || 90))) r.add(new Option(t, d));
+  r.value = rk && [...r.options].some(o => o.value === rk) ? rk : st.db ? '30' : '0';
+  $('#wrate').value = wrate;
+}
+// ใช้ไปตั้งแต่เที่ยงคืนของวันนี้ (เครื่องผู้ดู): ค่าล่าสุด − ค่าสุดท้ายก่อนเที่ยงคืน (ถ้าไม่มี ใช้จุดแรกของวัน)
+function wToday(c) {
+  const a = c ? series.get(c.id) || [] : []; if (!a.length) return null;
+  const m = new Date(); m.setHours(0, 0, 0, 0);
+  let base = null; for (const p of a) { if (p[0] < m.getTime()) base = p; else break; }
+  const after = a.filter(p => p[0] >= m.getTime()); if (!after.length && !base) return null;
+  const b = base || after[0], last = a[a.length - 1], u = (last[1] - b[1]) * wf();
+  return { u, partial: !base, t: last[0], from: b[0] };
+}
+function wHero() {
+  const c = wCard(), x = wToday(c), el = $('#whero'), r = Math.max(0, wrate) || 0; el.replaceChildren();
+  const tile = (l, v, u) => { const d = mk('div'), b = mk('b', v); b.appendChild(mk('span', u)); d.append(mk('small', l), b); el.appendChild(d); };
+  if (!c) { el.appendChild(mk('p', 'ยังไม่พบค่าตัวเลขจากมิเตอร์น้ำ', 'hint')); return; }
+  if (!x) { el.appendChild(mk('p', 'วันนี้ยังไม่มีข้อมูลจากมิเตอร์ (รอข้อมูลแรกของวัน)', 'hint')); return; }
+  if (x.u < 0) { el.appendChild(mk('p', 'ค่ามิเตอร์ลดลงจากเมื่อวาน (อาจถูกรีเซ็ตหรือเปลี่ยนมิเตอร์) จึงคิดยอดวันนี้ไม่ได้', 'hint')); return; }
+  tile('วันนี้ใช้ไป', fmt(x.u), 'หน่วย (m³)'); tile('คิดเป็นเงิน', baht(x.u * r), 'บาท');
+  el.appendChild(mk('small', 'ณ ' + hms(x.t) + ' · ราคา ' + baht(r) + ' บาท/หน่วย' + (x.partial ? ' · นับจากข้อมูลแรกของวัน (ไม่มีค่าก่อนเที่ยงคืน)' : '')));
+}
+function wBucket(pts, f, t0, t1) {            // น้ำที่ใช้เป็นรายชั่วโมง (ช่วงยาวมากรวมเป็น 6 ชม.)
+  if (pts.length < 2) return [];
+  const size = (t1 - t0) > 72 * 3600e3 ? 6 * 3600e3 : 3600e3, long = (t1 - t0) > 36 * 3600e3, out = [];
+  let i = 0, last = pts[0][1];
+  for (let s = Math.floor(t0 / size) * size; s < t1; s += size) {
+    let v = last; while (i < pts.length && pts[i][0] < s + size) { v = pts[i][1]; i++; }
+    out.push({ label: (long ? dm(s) + ' ' : '') + hm(s), u: Math.max(0, (v - last) * f) }); last = v;
+  }
+  return out;
+}
+async function wLoad() {
+  const tok = ++wTok, c = wCard(), days = +$('#wr').value || 0, f = wf(), r = Math.max(0, wrate) || 0;
+  wHero(); wSer = []; wBars = []; wMsg = ''; wSpan = days ? days * 864e5 : rangeMs; $('#wsum').replaceChildren(); $('#wtab').replaceChildren(); $('#wnote').textContent = '';
+  if (!c) { wMsg = 'ยังไม่พบค่าน้ำ'; wPlot(); return; }
+  $('#wsl').textContent = 'กำลังโหลด…'; wPlot();
+  let pts = [], dr = [];
+  try { pts = await cVolt(c, days); if (days && st.db) dr = await cDaily(c, days); }
+  catch (e) { if (tok === wTok) { $('#wsl').textContent = 'อ่านข้อมูลย้อนหลังไม่สำเร็จ ลองใหม่อีกครั้ง'; wPlot(); } return; }
+  if (tok !== wTok) return;
+  wSer = pts;
+  $('#wsl').textContent = days ? `ค่ามิเตอร์ ${days} วันล่าสุด (จากฐานข้อมูล · ค่าเฉลี่ยต่อช่วง)` : 'ค่ามิเตอร์สด · ' + rangeTxt();
+  const tile = (l, v) => { const d = mk('div'); d.append(mk('dt', l), mk('dd', v)); $('#wsum').appendChild(d); };
+  const mkT = (head, rows) => { const tb = mk('table'), hr = tb.createTHead().insertRow(); head.forEach(h => hr.appendChild(mk('th', h)));
+    const bd = tb.createTBody(); for (const row of rows) { const tr = bd.insertRow(); if (row.cls) tr.className = row.cls; row.c.forEach(v => tr.insertCell().textContent = v); } return tb; };
+  const money = u => u == null ? '–' : baht(u * r);
+  if (days && st.db) {
+    const list = dr.map(x => ({ d: x.d, u: x.delta == null ? null : Math.max(0, x.delta * f) })).sort((a, b) => a.d.localeCompare(b.d));
+    wBars = list.map(x => ({ label: x.d.slice(5), u: x.u || 0 }));
+    const full = list.length >= 4 ? list.slice(1, -1) : list, v = full.map(x => x.u).filter(x => x != null), av = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    const yd = new Date(Date.now() - 864e5).toLocaleDateString('sv-SE'), y = list.find(x => x.d === yd);
+    tile('เมื่อวานใช้', y && y.u != null ? fmt(y.u) + ' หน่วย · ' + money(y.u) + ' บาท' : '–');
+    tile('เฉลี่ยต่อวัน', av == null ? '–' : fmt(av) + ' หน่วย · ' + money(av) + ' บาท');
+    tile('ประมาณการต่อเดือน (30 วัน)', av == null ? '–' : fmt(av * 30) + ' หน่วย · ' + money(av * 30) + ' บาท');
+    let tu = 0; const body = list.slice().reverse().map(x => { if (x.u != null) tu += x.u; return { c: [x.d, x.u == null ? '–' : fmt(x.u), money(x.u)] }; });
+    if (list.length > 1) body.push({ cls: 'sum', c: ['รวม', fmt(tu), money(tu)] });
+    const mon = new Map(); for (const x of list) { const k = x.d.slice(0, 7), o = mon.get(k) || mon.set(k, { k, n: 0, u: 0 }).get(k); o.n++; o.u += x.u || 0; }
+    const mn = k => { const [yy, mm] = k.split('-'); try { return new Date(+yy, +mm - 1, 1).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }); } catch { return k; } };
+    $('#wtab').replaceChildren(mk('h3', 'รายเดือน (ตามเดือนปฏิทิน)'), mkT(['เดือน', 'ข้อมูล', 'ใช้ (หน่วย)', 'ค่าน้ำ (บาท)'], [...mon.values()].sort((a, b) => b.k.localeCompare(a.k)).map(o => ({ c: [mn(o.k), o.n + ' วัน', fmt(o.u), money(o.u)] }))),
+      mk('h3', 'รายวัน'), mkT(['วันที่', 'ใช้ (หน่วย)', 'ค่าน้ำ (บาท)'], body));
+    $('#wbt').textContent = 'ปริมาณน้ำที่ใช้ต่อวัน (หน่วย)';
+    $('#wnote').textContent = 'ใช้ = ค่ามิเตอร์ปลายวัน − ปลายวันก่อน · เมื่อวัน/เดือนแรกและวันนี้เป็นยอดบางส่วน · ต่อเดือน = เฉลี่ยต่อวัน × 30 · ราคาคิดแบบเหมาเท่ากันทุกหน่วย (ยังไม่ใช่อัตราก้าวหน้า/ค่าบริการ/VAT)';
+  } else {
+    const t1 = pts.length ? pts[pts.length - 1][0] : 0, t0 = pts.length ? pts[0][0] : 0;
+    wBars = wBucket(pts, f, t0, t1); $('#wbt').textContent = 'ปริมาณน้ำที่ใช้ต่อชั่วโมง (หน่วย)';
+    const u = pts.length > 1 ? (pts[pts.length - 1][1] - pts[0][1]) * f : null, per = u != null && t1 - t0 >= 600e3 ? u / (t1 - t0) * 864e5 : null;
+    tile('ใช้ในช่วงที่เลือก', u == null ? '–' : fmt(u) + ' หน่วย · ' + money(u) + ' บาท');
+    tile('ประมาณการต่อวัน', per == null ? '–' : fmt(per) + ' หน่วย · ' + money(per) + ' บาท');
+    tile('ประมาณการต่อเดือน (30 วัน)', per == null ? '–' : fmt(per * 30) + ' หน่วย · ' + money(per * 30) + ' บาท');
+    $('#wnote').textContent = (st.db ? 'ข้อมูลสดตามช่วงที่เลือก · เลือกช่วง 7/30 วันเพื่อดูยอดจริงรายวัน/รายเดือน' : 'ยังไม่ได้ตั้ง DATABASE_URL จึงเห็นเฉพาะข้อมูลสด (ตั้งฐานข้อมูลเพื่อดูรายวัน/รายเดือนย้อนหลัง)') + ' · ราคาคิดแบบเหมาเท่ากันทุกหน่วย';
+  }
+  wPlot();
+}
+function wCanvas(cv) {
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1; if (!w) return null;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement); g.font = '12px Sarabun, system-ui, sans-serif'; g.textBaseline = 'middle';
+  return { g, w, h, grid: css.getPropertyValue('--grid'), mute: css.getPropertyValue('--mute'), ink: css.getPropertyValue('--ink'), card: css.getPropertyValue('--card') };
+}
+function wTip(k, x, lines, T) {
+  const { g, w, ink, card } = k, tw = Math.max(...lines.map(l => g.measureText(l).width)) + 16, th = lines.length * 18 + 8, bx = Math.min(Math.max(x - tw / 2, 4), w - 8 - tw);
+  g.fillStyle = ink; g.beginPath(); g.roundRect ? g.roundRect(bx, T + 4, tw, th, 6) : g.rect(bx, T + 4, tw, th); g.fill();
+  g.fillStyle = card; g.textAlign = 'left'; lines.forEach((l, i) => g.fillText(l, bx + 8, T + 17 + i * 18));
+}
+function wPlot() {
+  const col = wDark() ? '#38bdf8' : '#0891b2', f = wf(), r = Math.max(0, wrate) || 0;
+  // กราฟเส้น: ค่ามิเตอร์ตามเวลา
+  let k = wCanvas($('#wcv'));
+  if (k) {
+    const { g, w, h } = k, pts = wSer.map(p => [p[0], p[1] * f]), R = 10, T = 10, B = 22, ph = h - T - B; let L = 56, pw = w - L - R;
+    if (pts.length < 2) { g.fillStyle = k.mute; g.textAlign = 'left'; g.fillText(wMsg || 'ยังไม่มีข้อมูลค่าน้ำในช่วงเวลานี้', L, h / 2); }
+    else {
+      let lo = Infinity, hi = -Infinity; for (const p of pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
+      if (lo === hi) { const d = Math.abs(lo) * .02 || 1; lo -= d; hi += d; } else { const d = (hi - lo) * .1; lo -= d; hi += d; }
+      const ya = yAxis(g, lo, hi, ph); L = ya.L; pw = w - L - R;
+      const t1 = Math.max(Date.now(), pts[pts.length - 1][0]), t0 = wSpan ? t1 - wSpan : pts[0][0], long = t1 - t0 > 36 * 3600e3;
+      const X = t => L + (t1 === t0 ? pw : (t - t0) / (t1 - t0) * pw), Y = v => T + (1 - (v - lo) / (hi - lo)) * ph, dec = hi - lo >= 100 ? 0 : hi - lo >= 10 ? 1 : hi - lo >= 1 ? 2 : 3;
+      drawAxes(g, { w, h, L, R, T, pw, ph, ya, t0, t1, X, Y, mute: k.mute, ink: k.ink, grid: k.grid });
+      strokeSegs(g, segs(pts, t1 - t0), X, Y, T + ph, col, { fill: true, T, dark: wDark(), lw: 2.3 });
+      if (wHx != null) {
+        let best = pts[0], bd = Infinity; for (const p of pts) { const d = Math.abs(X(p[0]) - wHx); if (d < bd) { bd = d; best = p; } }
+        const x = X(best[0]); g.strokeStyle = k.mute; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.setLineDash([]);
+        g.fillStyle = col; g.beginPath(); g.arc(x, Y(best[1]), 4.5, 0, 7); g.fill();
+        wTip(k, x, [(long ? dm(best[0]) + ' ' : '') + hms(best[0]), 'มิเตอร์ ' + fmt(best[1]) + ' m³'], T);
+      }
+    }
+  }
+  // กราฟแท่ง: น้ำที่ใช้ต่อชั่วโมง/ต่อวัน
+  k = wCanvas($('#wcb'));
+  if (k) {
+    const { g, w, h } = k, b = wBars, L = 56, R = 8, T = 8, B = 20, pw = w - L - R, ph = h - T - B;
+    if (!b.length) { g.fillStyle = k.mute; g.textAlign = 'left'; g.fillText('ยังไม่มีข้อมูลพอจะคำนวณ', L, h / 2); return; }
+    const mx = Math.max(...b.map(x => x.u), 1e-6) * 1.1, Y = v => T + (1 - v / mx) * ph, bw = pw / b.length, dec = mx >= 100 ? 0 : mx >= 10 ? 1 : mx >= 1 ? 2 : 3;
+    g.strokeStyle = k.grid; g.fillStyle = k.mute; g.lineWidth = 1; g.textAlign = 'right';
+    { const yt = yTicks(0, mx, 4); for (const v of yt.ticks) { const y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.fillText(yFmt(v, yt.dec), L - 6, y); } }
+    const every = Math.max(1, Math.ceil(b.length / 8)); g.textAlign = 'center';
+    b.forEach((x, i) => { const bx = L + i * bw, bh = ph - (Y(x.u) - T); g.fillStyle = col; g.globalAlpha = wHb === i ? 1 : .8; g.fillRect(bx + bw * .15, Y(x.u), Math.max(1, bw * .7), bh); g.globalAlpha = 1;
+      if (i % every === 0) { g.fillStyle = k.mute; g.fillText(x.label, bx + bw / 2, h - 8); } });
+    if (wHb != null && b[wHb]) { const x = b[wHb]; wTip(k, L + wHb * bw + bw / 2, [x.label, fmt(x.u) + ' หน่วย', baht(x.u * r) + ' บาท'], T); }
+  }
+}
+{
+  const c1 = $('#wcv'), c2 = $('#wcb');
+  const m1 = e => { wHx = e.clientX - c1.getBoundingClientRect().left; wPlot(); };
+  const m2 = e => { const x = e.clientX - c2.getBoundingClientRect().left - 56, n = wBars.length; wHb = n && x >= 0 ? Math.min(n - 1, Math.floor(x / ((c2.clientWidth - 64) / n))) : null; wPlot(); };
+  c1.addEventListener('pointermove', m1); c1.addEventListener('pointerdown', m1); c1.addEventListener('pointerleave', () => { wHx = null; wPlot(); });
+  c2.addEventListener('pointermove', m2); c2.addEventListener('pointerdown', m2); c2.addEventListener('pointerleave', () => { wHb = null; wPlot(); });
+  $('#wtrb').onclick = () => { wFill(); $('#wdlg').showModal(); wLoad(); clearInterval(wTimer); wTimer = setInterval(() => { if (!$('#wdlg').open) return; if (+$('#wr').value) wHero(); else wLoad(); }, 30000); };
+  $('#wk').onchange = $('#wr').onchange = wLoad;
+  $('#wu').onchange = () => { try { localStorage.setItem('wunit', $('#wu').value); } catch {} wLoad(); };
+  $('#wrate').oninput = e => { const v = parseFloat(e.target.value); wrate = v >= 0 ? v : 0; try { localStorage.setItem('wrate', wrate); } catch {} wLoad(); };
+  $('#wx').onclick = () => $('#wdlg').close();
+  $('#wdlg').onclick = e => { if (e.target === $('#wdlg')) $('#wdlg').close(); };
+  $('#wdlg').onclose = () => { wTok++; wHx = wHb = null; clearInterval(wTimer); };
+  addEventListener('resize', () => { if ($('#wdlg').open) wPlot(); });
+}
+
+// ---------- เลือกค่าที่จะส่ง Telegram ----------
+const sel = new Set(); try { JSON.parse(localStorage.getItem('sel') || '[]').forEach(k => sel.add(k)); } catch {}
+const saveSel = () => { try { localStorage.setItem('sel', JSON.stringify([...sel])); } catch {} };
+const selMode = () => document.body.classList.contains('sel');
+function act(c) { selMode() ? toggleSel(c) : openDlg(c); }
+function toggleSel(c) { sel.has(c.id) ? sel.delete(c.id) : sel.add(c.id); saveSel(); selMark(c.id); selUp(); }
+function selMark(id) { const on = sel.has(id), c = cards.get(id), t = tiles.get(id); if (c) { c.el.classList.toggle('on', on); if (c.row) c.row.tr.classList.toggle('on', on); } if (t) t.el.classList.toggle('on', on); }
+const selKeys = () => [...sel].filter(k => cards.has(k));
+function selUp() {
+  const n = selKeys().length;
+  $('#selt').textContent = n ? `เลือกแล้ว ${n} ค่า · ย้อนหลัง ${rangeMs ? $('#range').selectedOptions[0].textContent : 'ทั้งหมดที่มี'}` : 'แตะการ์ดที่ต้องการส่งเข้า Telegram';
+  $('#ssend').disabled = !n; $('#ssend').textContent = n ? `ส่ง ${n} ค่าเข้า Telegram` : 'ส่งเข้า Telegram';
+}
+
+// ---------- รับข้อมูล ----------
+// topic ที่เคยมีค่าตัวเลข: ถ้าบางรอบอุปกรณ์ส่งมาแต่ null ทุกค่า จะไม่สร้างการ์ดข้อความ JSON ดิบทับ (การ์ดตัวเลขจะขึ้นป้าย "ไม่มีข้อมูลใหม่" เองถ้าค่านิ่งหาย)
+const numTopics = new Set();
+// กลุ่มที่ไม่ต้องแสดงในหน้านี้ (CT1, CT2, … ซ้ำกับ Grid In / Solar Cell) — ข้อมูลยังถูกบันทึกลงฐานข้อมูลและ Telegram ตามเดิม แก้ที่นี่ถ้าต้องการซ่อนชื่ออื่น
+const HIDE_GROUP = /^ct\s*\d*$/i;
+const isHidden = id => HIDE_GROUP.test(groupOf(id));
+function dropText(topic) {
+  const c = cards.get('t:' + topic); if (!c) return;
+  c.el.remove(); c.row.tr.remove(); cards.delete(c.id); sel.delete(c.id);
+  const g = c.group, n = [...cards.values()].filter(x => x.group === g).length;
+  if (n) relayoutGroup(g); else { g.sec.remove(); groups.delete(g.name); }
+  relayoutGroup(pinGrp); rebuildTable(); hidUp();
+}
+function live(m) {
+  if (!m.pts.length) {
+    if (numTopics.has(m.topic)) return;
+    const c = getCard('t:' + m.topic, false); c.text = m.payload; c.t = m.t; return mark(c);
+  }
+  numTopics.add(m.topic); dropText(m.topic);
+  for (const p of m.pts) {
+    if (isHidden(p.k)) continue;
+    const c = getCard(p.k, true); c.last = { v: p.v }; c.t = m.t;
+    let a = series.get(p.k); if (!a) series.set(p.k, a = []);
+    const l = a[a.length - 1];
+    if (!l || m.t - l[0] >= gap) {
+      a.push([m.t, p.v]);
+      const cut = m.t - histMs; let i = 0;                                   // ตัดตามเวลา (เหมือนเซิร์ฟเวอร์) ไม่ใช่ตามจำนวน
+      while (i < a.length - 1 && a[i][0] < cut) i++;
+      if (i) a.splice(0, i);
+      if (a.length > histMax) a.splice(0, a.length - histMax);
+    }
+    mark(c);
+  }
+}
+function snapshot(m) {
+  gap = m.gap || gap; histMs = m.histMs || histMs; histMax = m.histMax || histMax; series.clear();
+  for (const [k, a] of Object.entries(m.history || {})) {
+    if (isHidden(k)) continue;
+    series.set(k, a);
+    const c = getCard(k, true), l = a[a.length - 1];
+    if (l && l[0] >= c.t) { c.last = { v: l[1] }; c.t = l[0]; }
+    mark(c);
+  }
+  const numeric = new Set(m.numeric || []);
+  numeric.forEach(t => { numTopics.add(t); dropText(t); });
+  for (const it of m.items || []) if (!numeric.has(it.topic)) { const c = getCard('t:' + it.topic, false); c.text = it.payload; c.t = it.t; mark(c); }
+  cards.forEach(mark);
+}
+
+function setStatus() {
+  const ok = wsUp && st.connected, b = $('#ban');
+  b.className = 'banner ' + (ok ? 'ok' : wsUp ? 'bad' : 'warn');
+  $('#stxt').textContent = !wsUp ? 'กำลังต่อเซิร์ฟเวอร์ใหม่… ค่าที่เห็นอาจไม่ใช่ค่าล่าสุด'
+    : st.connected ? 'ระบบทำงานปกติ · กำลังรับข้อมูลสด'
+    : 'เชื่อมต่ออุปกรณ์ไม่ได้ในขณะนี้' + (st.error ? ' (' + st.error + ')' : '');
+  $('#rep').hidden = !st.tg; $('#dsend').hidden = !st.tg; $('#hbtn').hidden = !st.db;
+  sumUp();
+}
+function sumUp() {
+  const all = [...cards.values()].filter(c => c.t), old = all.filter(c => Date.now() - c.t > STALE).length;
+  $('#sum').textContent = all.length ? `ทั้งหมด ${all.length} ค่า · ข้อมูลสด ${all.length - old} ค่า` + (old ? ` · ไม่มีข้อมูลใหม่ ${old} ค่า (ดูป้ายสีเหลือง)` : '') : '';
+}
+// ถ้าล็อกอินหมดอายุ/ถูกเตะ (เปลี่ยนรหัสผ่านหรือ APP_SECRET) เซิร์ฟเวอร์ตอบ 401: พากลับหน้า login แทนที่จะวนต่อใหม่ไปเรื่อยๆ
+function authCheck() { fetch('/mqttdata', { cache: 'no-store' }).then(r => { if (r.status === 401) location.href = '/login'; }).catch(() => {}); }
+let ws, backoff = 1000;
+function connect() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  ws.onopen = () => { backoff = 1000; wsUp = true; setStatus(); };
+  ws.onclose = () => { wsUp = false; setStatus(); authCheck(); setTimeout(connect, backoff); backoff = Math.min(backoff * 1.7, 15000); };
+  ws.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.kind === 'status') { st = m; setStatus(); } else if (m.kind === 'snapshot') snapshot(m); else if (m.kind === 'msg') live(m);
+    else if (m.kind === 'reset') {          // มีการล้างข้อมูล: ล้างกราฟในหน้านี้ให้ตรงกับเซิร์ฟเวอร์
+      if (m.keys) m.keys.forEach(k => series.delete(k)); else series.clear();
+      cards.forEach(c => { if (!m.keys || m.keys.includes(c.id)) c.pts = []; mark(c); });
+    }
+  };
+}
+connect();
+setInterval(() => ws && ws.readyState === 1 && ws.send('ping'), 20000);   // กันเซิร์ฟเวอร์ฟรีหลับ
+let tick = 0;
+setInterval(() => { tick++; cards.forEach(c => tick % 5 ? setAge(c) : mark(c)); sumUp(); }, 1000);
+addEventListener('resize', () => cards.forEach(mark));
+
+// ---------- ตัวควบคุม ----------
+$('#range').onchange = e => { rangeMs = +e.target.value; try { localStorage.setItem('range', rangeMs); } catch {} cards.forEach(mark); selUp(); };
+$('#q').oninput = () => { cards.forEach(applyFilter); tblVis(); };
+document.querySelectorAll('#vw button').forEach(b => b.onclick = () => setView(b.dataset.v));
+$('#shh').onclick = () => { showHid = !showHid; refreshVis(); };
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 4000); }
+$('#rep').onclick = () => { const on = document.body.classList.toggle('sel'); $('#rep').textContent = on ? '✕ เลิกเลือก' : '📨 เลือกค่าส่ง Telegram'; selUp(); };
+$('#sall').onclick = () => { cards.forEach(c => { if (!c.el.hidden) { sel.add(c.id); selMark(c.id); } }); saveSel(); selUp(); };
+$('#sclr').onclick = () => { sel.clear(); saveSel(); cards.forEach(c => selMark(c.id)); selUp(); };
+async function sendTg(keys, btn) {
+  if (!keys.length) return toast('ยังไม่ได้เลือกค่าที่จะส่ง');
+  btn.disabled = true; toast('กำลังสร้างและส่ง…');
+  try {
+    const r = await fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keys, hours: rangeMs / 3600e3 }) });
+    toast((await r.json()).msg);
+  } catch { toast('ส่งไม่สำเร็จ: เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); }
+  btn.disabled = false; selUp();
+}
+$('#ssend').onclick = e => sendTg(selKeys(), e.currentTarget);
+$('#dsend').onclick = e => dlgC && sendTg([dlgC.id], e.currentTarget);
+setView(view); hidUp();
+// ---- ติดตั้งเป็นแอป (PWA) ----
+let instEv = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); instEv = e; $('#inst').hidden = false; });
+addEventListener('appinstalled', () => { instEv = null; $('#inst').hidden = true; });
+$('#inst').onclick = async () => { if (!instEv) return; instEv.prompt(); try { await instEv.userChoice; } catch {} instEv = null; $('#inst').hidden = true; };
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+</script>
+</body>
+</html>

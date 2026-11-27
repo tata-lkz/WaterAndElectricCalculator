@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ · MQTT Viewer</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" id="tc" content="#060a12">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="MQTT Viewer">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600&family=Sarabun:wght@400;600&family=Chakra+Petch:wght@500;600&display=swap" rel="stylesheet">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'dark'}catch{document.documentElement.dataset.theme='dark'}</script>
+<style>
+:root{color-scheme:light dark;--bg:#edf2f5;--card:#fff;--ink:#14303c;--mute:#566f7d;--line:#d9e4ea;--acc:#0f7f95;--bad:#b4311f;--badbg:#fbe3df;font-family:Sarabun,"Noto Sans Thai",system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#0a141a;--card:#122029;--ink:#e6f3f7;--mute:#8fabb7;--line:#223a46;--acc:#35d0e8;--bad:#ff8672;--badbg:#3b1812}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);padding:16px;font-size:16px}
+form{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--acc);border-radius:16px;padding:28px 24px;width:min(100%,360px);display:flex;flex-direction:column;gap:12px}
+h1{font:600 22px Prompt,Sarabun,sans-serif;margin:0}
+.lead{margin:0 0 4px;color:var(--mute);font-size:15px}
+label{font-size:15px;font-weight:600}
+input,button{font:inherit;padding:11px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+button{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600;cursor:pointer}
+@media(prefers-color-scheme:dark){button{color:#04222a}}
+.err{color:var(--bad);background:var(--badbg);border-radius:10px;padding:9px 12px;font-size:14px;margin:0}
+.err[hidden]{display:none}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+:root[data-theme=dark]{--bg:#060a12;--card:#0d1522;--ink:#e8f6ff;--mute:#8aa3b8;--line:#1b2b3f;--acc:#22e1ff;--bad:#ff6b8a;--badbg:rgba(255,107,138,.13)}
+:root[data-theme=light]{--bg:#edf2f5;--card:#fff;--ink:#14303c;--mute:#566f7d;--line:#d9e4ea;--acc:#0f7f95;--bad:#b4311f;--badbg:#fbe3df}
+:root[data-theme=dark] body{background:linear-gradient(rgba(34,225,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(34,225,255,.035) 1px,transparent 1px),radial-gradient(800px 480px at 10% -8%,rgba(34,225,255,.16),transparent 62%),radial-gradient(760px 480px at 100% 0,rgba(168,85,247,.15),transparent 62%),var(--bg);background-size:44px 44px,44px 44px,auto,auto,auto;background-attachment:fixed}
+form{position:relative;border-radius:20px;border-top-width:1px}
+form::before{content:"";position:absolute;left:24px;right:24px;top:-1px;height:2px;border-radius:0 0 4px 4px;background:var(--acc)}
+:root[data-theme=dark] form{border-color:color-mix(in srgb,var(--acc) 35%,var(--line));box-shadow:0 0 60px -18px var(--acc),0 24px 60px rgba(0,0,0,.5)}
+:root[data-theme=dark] form::before{box-shadow:0 0 14px 1px var(--acc)}
+h1{font-family:'Chakra Petch',Prompt,sans-serif;font-size:26px}
+:root[data-theme=dark] h1{color:#fff;text-shadow:0 0 6px var(--acc),0 0 24px color-mix(in srgb,var(--acc) 70%,transparent)}
+input:focus{border-color:var(--acc);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 25%,transparent)}
+button,:root[data-theme=dark] button{background:linear-gradient(135deg,#0e7490,#6d28d9);border-color:transparent;color:#fff}
+:root[data-theme=dark] button{box-shadow:0 0 18px -4px #22e1ff,0 0 26px -8px #a855f7}
+</style>
+</head>
+<body>
+<form method="post" action="/login">
+  <h1>MQTT Viewer</h1>
+  <p class="lead">กรอกรหัสผ่านเพื่อดูค่าจากอุปกรณ์</p>
+  <p class="err" id="e" hidden>รหัสผ่านไม่ถูกต้อง ลองพิมพ์ใหม่อีกครั้ง</p>
+  <label for="p">รหัสผ่าน</label>
+  <input id="p" name="password" type="password" autocomplete="current-password" autofocus required>
+  <button type="submit">เข้าสู่ระบบ</button>
+</form>
+<script>if (location.search.includes('e=1')) document.getElementById('e').hidden = false;
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));</script>
+</body>
+</html>
