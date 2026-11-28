@@ -886,7 +886,7 @@ async function logLoad() {
     return;
   }
   $('#loff').hidden = on; $('#lctl').hidden = !on; $('#lflush').hidden = !on;
-  $('#lsub').textContent = on ? `บันทึกรายนาทีอัตโนมัติตลอดเวลา · เก็บย้อนหลัง ${i.days} วัน` + (i.rollup ? ` (เก่ากว่า ${i.rollup} วันย่อเป็นรายชั่วโมง)` : '') + ` · เขียนลงฐานข้อมูลทุก ${i.flushMin} นาที`
+  $('#lsub').textContent = on ? `บันทึกรายนาทีอัตโนมัติตลอดเวลา · เก็บย้อนหลัง ${i.days} วัน` + (i.rollup ? ` (เก่ากว่า ${i.rollup} วันย่อเป็นรายชั่วโมง)` : '') + (i.flushMin ? ` · เขียนลงฐานข้อมูลทุก ${i.flushMin} นาที` : ' · เขียนลงฐานข้อมูลทันที')
     + (i.lastOk ? ` · บันทึกล่าสุด ${hm(i.lastOk)}` : '') + (i.pending ? ` · รอเขียน ${i.pending} รายการ` : '') : '';
   $('#lerr').hidden = !i.lastErr; $('#lerr').textContent = i.lastErr ? '⚠️ บันทึกลงฐานข้อมูลล่าสุดไม่สำเร็จ (ระบบจะลองใหม่เอง): ' + i.lastErr : '';
   if (!on) return;
@@ -894,7 +894,7 @@ async function logLoad() {
   const rows = (j.data || []).slice(), isImp = r => TITLES.has(info(r.k, true).title);
   rows.sort((a, b) => isImp(b) - isImp(a));
   const shown = $('#lall').checked && rows.some(isImp) ? rows.filter(isImp) : rows, box = $('#ltab');
-  if (!shown.length) { box.replaceChildren(mk('p', `ยังไม่มีข้อมูลในช่วงนี้ ระบบเขียนลงฐานข้อมูลทุก ${i.flushMin} นาที กด "💾 บันทึกตอนนี้" เพื่อดูข้อมูลล่าสุดทันที`, 'hint')); return; }
+  if (!shown.length) { box.replaceChildren(mk('p', `ยังไม่มีข้อมูลในช่วงนี้ ${i.flushMin ? `ระบบเขียนลงฐานข้อมูลทุก ${i.flushMin} นาที` : 'ระบบเขียนลงฐานข้อมูลทันที'} กด "💾 บันทึกตอนนี้" เพื่อดูข้อมูลล่าสุดทันที`, 'hint')); return; }
   const tb = mk('table', null, 'lt'), hr = tb.createTHead().insertRow();
   ['ค่า', 'ล่าสุด', 'ต่ำสุด', 'สูงสุด', 'เฉลี่ย', 'ข้อมูลที่เก็บไว้', ''].forEach(h => hr.appendChild(mk('th', h)));
   const body = tb.createTBody();
@@ -991,7 +991,7 @@ async function hLoad() {
     const dd = hPts[hPts.length - 1][1] - hPts[0][1];
     [fmt(lo), fmt(hi), fmt(sum / hPts.length), (dd > 0 ? '+' : '') + fmt(dd)].forEach((s, i) => { $('#hst').querySelectorAll('dd')[i].textContent = s; });
     $('#hsl').textContent = `สรุป ${days} วันล่าสุด (จากฐานข้อมูล · ค่าเฉลี่ยต่อช่วง)`;
-  } else $('#hsl').textContent = `ยังไม่มีข้อมูลในฐานข้อมูลช่วงนี้ ระบบเขียนลงฐานข้อมูลทุก ${st.dbFlushMin || 15} นาที — เปิด 📒 Datalog แล้วกด "💾 บันทึกตอนนี้" เพื่อดูข้อมูลล่าสุดทันที`;
+  } else $('#hsl').textContent = `ยังไม่มีข้อมูลในฐานข้อมูลช่วงนี้ ${st.dbFlushMin ? `ระบบเขียนลงฐานข้อมูลทุก ${st.dbFlushMin} นาที` : 'ข้อมูลจะถูกบันทึกทันทีเมื่อมีข้อความ MQTT'} — เปิด 📒 Datalog แล้วกด "💾 บันทึกตอนนี้" เพื่อบันทึกค่าที่ค้าง`;
   hDraw();
 }
 {
