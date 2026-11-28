@@ -26,7 +26,6 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const mqtt = require('mqtt');
 const { WebSocketServer } = require('ws');
 const datalog = require('./datalog');
-const isDemoTopic = topic => /^demo(?:\/|$)/i.test(topic);
 
 process.on('unhandledRejection', e => console.error('[unhandledRejection]', e && e.message || e));
 
@@ -35,7 +34,7 @@ const CFG = {
   url: process.env.MQTT_URL || '',
   username: process.env.MQTT_USER || '',
   password: process.env.MQTT_PASS || '',
-  topics: (process.env.MQTT_TOPICS || 'Water/Meter/Value').split(',').map(s => s.trim()).filter(Boolean).filter(s => !/^demo(?:\/|$)/i.test(s)),
+  topics: (process.env.MQTT_TOPICS || 'Water/Meter/Value').split(',').map(s => s.trim()).filter(Boolean),
   port: +process.env.PORT || 3100,
   appPass: process.env.APP_PASS || '',
   histMs: num(process.env.HISTORY_HOURS, 24) * 3600e3,
@@ -222,12 +221,12 @@ const server = http.createServer((req, res) => {
     if (!datalog.on) return json(res, 200, { ok: false, on: false, data: [], msg: 'ยังไม่ได้เปิดการบันทึกถาวร (ตั้ง DATABASE_URL)' });
     const fail = e => { console.error('[db]', e.message); json(res, 500, { ok: false, msg: 'ฐานข้อมูลผิดพลาด ลองใหม่อีกครั้ง' }); };
     if (u === '/api/log/summary' && req.method === 'GET')
-      return datalog.summary(+q.get('days') || 7).then(data => json(res, 200, { ok: true, on: true, data: data.filter(x => !isDemoTopic(x.k)),
+      return datalog.summary(+q.get('days') || 7).then(data => json(res, 200, { ok: true, on: true, data,
         info: { ...datalog.stat(), days: datalog.DAYS, flushMin: datalog.FLUSH_MIN, now: Date.now() } }), fail);
     if (u === '/api/log/export' && req.method === 'GET') {
       const k = q.get('k') || ''; if (!k || k.length > 400) return json(res, 400, { ok: false, msg: 'ไม่พบชื่อค่า' });
       return datalog.rows(k, +q.get('days') || 30).then(rows => {
-        const out = ['﻿เวลา,เฉลี่ย,ต่ำสุด,สูงสุด,ล่าสุด'];
+        const out = ['เวลา,เฉลี่ย,ต่ำสุด,สูงสุด,ล่าสุด'];
         for (const r of rows) out.push(csvTime(r[0]) + ',' + r.slice(1).join(','));
         const name = 'datalog-' + k.replace(/[^\w฀-๿.-]+/g, '_').slice(0, 80) + '.csv';
         res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="datalog.csv"; filename*=UTF-8''${encodeURIComponent(name)}` });
@@ -284,7 +283,6 @@ setInterval(() => wss.clients.forEach(c => c.readyState === 1 && c.ping()), 2500
 
 // ---------- MQTT ----------
 datalog.start(series, CFG.histMs, CFG.histMax, CFG.maxKeys).then(() => {
-  for (const k of series.keys()) if (isDemoTopic(k)) series.delete(k);
   if (datalog.on) bcast(snapshotMsg());
 });   // โหลดประวัติจากฐานข้อมูลเข้ากราฟ (ถ้าไม่ตั้ง DATABASE_URL จะไม่ทำอะไร)
 const opts = { reconnectPeriod: 3000, connectTimeout: 10000, keepalive: 60, protocolVersion: 4 };
@@ -309,7 +307,6 @@ client.on('connect', () => {
 client.on('error', e => { state.error = e.message; console.error('[mqtt] error', e.message); bcast(statusMsg()); });
 client.on('close', () => { if (state.connected) wdDown(); state.connected = false; bcast(statusMsg()); });
 client.on('message', (topic, buf, packet) => {
-  if (isDemoTopic(topic)) return;
   const t = Date.now(), payload = buf.toString();
   datalog.addMessage(topic, buf, t, packet);
   const prev = store.get(topic);
