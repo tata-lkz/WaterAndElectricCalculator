@@ -167,7 +167,7 @@ function serve(res, file) {
 }
 const redirect = (res, to, extra) => { res.writeHead(302, { Location: to, ...(extra || {}) }); res.end(); };
 const json = (res, code, o) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(o)); };
-let lastManual = 0;
+let lastManual = 0; const lastBillManual = { water: 0, electric: 0 };
 const readJson = (req, max = 4000) => new Promise(ok => {
   if (!String(req.headers['content-type'] || '').startsWith('application/json')) return ok(null);   // กันฟอร์มข้ามเว็บ (CSRF)
   let b = '';
@@ -249,7 +249,7 @@ const server = http.createServer((req, res) => {
       }).catch(fail);
     return json(res, 404, { ok: false });
   }
-  if (u === '/api/report' && req.method === 'POST') {          // ปุ่ม "ส่งเข้า Telegram" ในหน้าเว็บ (ส่งเฉพาะค่าที่เลือก)
+  if (u === '/api/bill' && req.method === 'POST') {     return readJson(req, 4000).then(o => {       if (!TG.on) return json(res, 503, { ok: false, msg: 'Telegram Bot ยังไม่ได้ตั้งค่า' });       if (!o || !['water', 'electric'].includes(o.kind) || !Number.isFinite(o.from) || !Number.isFinite(o.to) || !Number.isFinite(o.amount) || Math.abs(o.from) > 8640000000000000 || Math.abs(o.to) > 8640000000000000 || o.from >= o.to || o.amount < 0)         return json(res, 400, { ok: false, msg: 'ข้อมูลบิลไม่ถูกต้อง' });       const now = Date.now();       if (now - lastBillManual[o.kind] < 5000) return json(res, 429, { ok: false, msg: 'รอสักครู่ แล้วค่อยส่งบิลอีกครั้ง' });       lastBillManual[o.kind] = now;       const title = o.kind === 'water' ? 'ค่าน้ำ' : 'ค่าไฟ';       const text = title + 'จาก ' + dmy(o.from) + ' ถึง ' + dmy(o.to) + ' สุทธิ ' + Number(o.amount).toFixed(2) + ' บาท';       return Promise.all(TG.chats.map(chat => tg('sendMessage', { chat_id: chat, text }))).then(         () => json(res, 200, { ok: true, msg: 'ส่งบิลเข้า AI Bot แล้ว' }),         e => { console.error('[tg] bill send', e.message); json(res, 502, { ok: false, msg: 'ส่งบิลไม่สำเร็จ: ' + e.message }); }       );     });   }   if (u === '/api/report' && req.method === 'POST') {          // ปุ่ม "ส่งเข้า Telegram" ในหน้าเว็บ (ส่งเฉพาะค่าที่เลือก)
     let body = '';
     req.on('data', d => { body += d; if (body.length > 40000) req.destroy(); });
     return req.on('end', () => {
