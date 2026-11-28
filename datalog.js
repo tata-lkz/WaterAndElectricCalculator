@@ -2,13 +2,15 @@
 // ไม่ตั้ง DATABASE_URL = ปิดฟีเจอร์นี้ (ระบบทำงานเหมือนเดิม เก็บแค่ในหน่วยความจำ)
 //   DATABASE_URL    connection string ของ Postgres
 //   LOG_DAYS        เก็บย้อนหลังกี่วัน (90)  เกินแล้วลบอัตโนมัติ
-//   LOG_FLUSH_MIN   บันทึกลงฐานข้อมูลทุกกี่นาที (15)  ยิ่งนาน Neon ยิ่งได้หลับ ประหยัดโควตาฟรี
+//   LOG_FLUSH_MIN   0 (ค่าเริ่มต้น) = บันทึกทันที, มากกว่า 0 = บันทึกเป็นรอบนาที
 //   LOG_ROLLUP_DAYS ข้อมูลเก่ากว่ากี่วันให้ย่อเป็นรายชั่วโมง (7)  ลดขนาดฐานข้อมูลราว 60 เท่า ใส่ 0 = ไม่ย่อ เก็บรายนาทีตลอด
 // เก็บเป็นรายนาที: ค่าเฉลี่ย/ต่ำสุด/สูงสุด/ล่าสุด ของแต่ละค่า (ประมาณ 2-3 MB ต่อวัน ต่อ 15 ค่า)
 const url = process.env.DATABASE_URL || '';
 const DAYS = +process.env.LOG_DAYS > 0 ? +process.env.LOG_DAYS : 90;
-const FLUSH_MS = (+process.env.LOG_FLUSH_MIN > 0 ? +process.env.LOG_FLUSH_MIN : 15) * 60e3;
-const FLUSH_MIN = FLUSH_MS / 60e3;
+const FLUSH_RAW = process.env.LOG_FLUSH_MIN;
+const FLUSH_MIN = FLUSH_RAW === undefined || FLUSH_RAW === '' ? 0
+  : Number.isFinite(+FLUSH_RAW) && +FLUSH_RAW >= 0 ? +FLUSH_RAW : 15;
+const FLUSH_MS = FLUSH_MIN * 60e3;
 const ROLL_RAW = process.env.LOG_ROLLUP_DAYS;
 const ROLLUP_SET = ROLL_RAW !== undefined && ROLL_RAW !== '' && isFinite(+ROLL_RAW) ? Math.max(0, +ROLL_RAW) : 7;
 const ROLLUP = ROLLUP_SET > 0 && ROLLUP_SET < DAYS ? ROLLUP_SET : 0;   // 0 = ปิด (หรือตั้งมากกว่า LOG_DAYS ซึ่งไม่มีความหมาย)
@@ -59,13 +61,17 @@ function build() {
   }
 
   // รวมค่าเป็นรายนาทีในหน่วยความจำ
-  function add(k, t, v) {
-    const m = Math.floor(t / 60000) * 60000; let b = cur.get(k);
-    if (b && b.m !== m) { queue.push([k, b]); b = null; }
-    if (!b) cur.set(k, b = { m, n: 0, s: 0, mn: v, mx: v, la: v });
-    b.n++; b.s += v; if (v < b.mn) b.mn = v; if (v > b.mx) b.mx = v; b.la = v;
-    if (queue.length > 60000) queue.splice(0, queue.length - 60000);     // ฐานข้อมูลล่มนาน: ทิ้งของเก่าสุด กันกินแรม
+  function addMany(points, t) {
+    for (const { k, v } of points) {
+      const m = Math.floor(t / 60000) * 60000; let b = cur.get(k);
+      if (b && b.m !== m) { queue.push([k, b]); b = null; }
+      if (!b) cur.set(k, b = { m, n: 0, s: 0, mn: v, mx: v, la: v });
+      b.n++; b.s += v; if (v < b.mn) b.mn = v; if (v > b.mx) b.mx = v; b.la = v;
+      if (queue.length > 60000) queue.splice(0, queue.length - 60000);     // ฐานข้อมูลล่มนาน: ทิ้งของเก่าสุด กันกินแรม
+    }
+    if (FLUSH_MIN === 0 && points.length) flush(true);
   }
+  const add = (k, t, v) => addMany([{ k, v }], t);
 
   async function doFlush(all) {
     const nowMin = Math.floor(Date.now() / 60000) * 60000;
@@ -146,7 +152,7 @@ function build() {
   }
   // ฐานข้อมูลฟรี (Neon) อาจกำลังตื่น: ลองใหม่สูงสุด 4 ครั้ง ถ้ายังไม่ได้ก็ทำงานต่อ บันทึกข้อมูลใหม่ได้ตามปกติ
   async function start(series, histMs, histMax, maxKeys = Infinity) {
-    setInterval(() => flush(false), FLUSH_MS);
+    setInterval(() => flush(false), FLUSH_MS || 10000);   // โหมดทันที: ตรวจคิวซ้ำทุก 10 วินาทีเมื่อ Neon ขัดข้อง
     setInterval(maintain, 6 * 3600e3);
     for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { flush(true).finally(() => process.exit(0)); });   // ดีพลอยใหม่/ปิดเครื่อง: บันทึกที่ค้างก่อน
     for (let i = 1; i <= 4; i++) {
@@ -220,10 +226,10 @@ function build() {
   // บันทึกค่าที่ค้างในหน่วยความจำลงฐานข้อมูลทันที (ถ้าเขียนไม่สำเร็จ จะโยน error กลับไปให้ผู้เรียกรู้ ไม่แกล้งตอบว่าสำเร็จ)
   const flushNow = async () => { lastErr = ''; await flush(true); if (lastErr) throw new Error(lastErr); };
   const stat = () => ({ lastOk, lastErr, pending: queue.length + cur.size, rollup: ROLLUP });
-  return { on: true, DAYS, FLUSH_MIN, ROLLUP, add, start, history, daily, summary, rows, reset, flushNow, stat };
+  return { on: true, DAYS, FLUSH_MIN, ROLLUP, add, addMany, start, history, daily, summary, rows, reset, flushNow, stat };
 }
 
 module.exports = url ? build() : {
-  on: false, DAYS, FLUSH_MIN, ROLLUP, add() {}, async start() {}, async history() { return []; }, async daily() { return []; },
+  on: false, DAYS, FLUSH_MIN, ROLLUP, add() {}, addMany() {}, async start() {}, async history() { return []; }, async daily() { return []; },
   async summary() { return []; }, async rows() { return []; }, async reset() {}, async flushNow() {}, stat() { return { lastOk: 0, lastErr: '', pending: 0, rollup: ROLLUP }; },
 };

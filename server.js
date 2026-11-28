@@ -20,6 +20,8 @@
 //              WATCH_RULES      กำหนดเวลาแยกตามชื่อ topic เช่น water=30,demo/data=3,test=0  (ชื่อมีคำนี้ = ใช้เวลานี้, 0 = ไม่เฝ้า)
 //              WATCH_BROKER_S   (60) broker หลุดเกินกี่วินาทีถึงแจ้ง (0 = ปิด)
 //              WATCH_REPEAT_MIN (0)  เตือนซ้ำทุกกี่นาทีถ้ายังไม่กลับมา (0 = แจ้งครั้งเดียว)
+require('dotenv').config();
+
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto'), os = require('os');
 const mqtt = require('mqtt');
 const { WebSocketServer } = require('ws');
@@ -311,7 +313,8 @@ client.on('message', (topic, buf, packet) => {
   store.set(topic, m);
   const pts = numbers(topic, m.payload);
   if (pts.length) numericTopics.add(topic);
-  for (const p of pts) { record(p.k, m.t, p.v); if (series.has(p.k)) datalog.add(p.k, m.t, p.v); }   // datalog เก็บทุกค่า ไม่ผ่านตัวกรองช่วงห่าง histGap
+  for (const p of pts) record(p.k, m.t, p.v);
+  datalog.addMany(pts.filter(p => series.has(p.k)), m.t);   // บันทึกทุกค่าโดยไม่ผ่านตัวกรองช่วงห่าง histGap
   bcast({ kind: 'msg', ...m, pts });
 });
 
