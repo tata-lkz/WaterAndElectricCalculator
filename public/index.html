@@ -896,13 +896,13 @@ async function logLoad() {
   const shown = $('#lall').checked && rows.some(isImp) ? rows.filter(isImp) : rows, box = $('#ltab');
   if (!shown.length) { box.replaceChildren(mk('p', `ยังไม่มีข้อมูลในช่วงนี้ ${i.flushMin ? `ระบบเขียนลงฐานข้อมูลทุก ${i.flushMin} นาที` : 'ระบบเขียนลงฐานข้อมูลทันที'} กด "💾 บันทึกตอนนี้" เพื่อดูข้อมูลล่าสุดทันที`, 'hint')); return; }
   const tb = mk('table', null, 'lt'), hr = tb.createTHead().insertRow();
-  ['ค่า', 'ล่าสุด', 'ต่ำสุด', 'สูงสุด', 'เฉลี่ย', 'ข้อมูลที่เก็บไว้', ''].forEach(h => hr.appendChild(mk('th', h)));
+  ['ค่า', 'ล่าสุด', 'ต่ำสุด', 'สูงสุด', 'เฉลี่ย', 'ช่วงข้อมูล', ''].forEach(h => hr.appendChild(mk('th', h)));
   const body = tb.createTBody();
   for (const r of shown) {
     const f = info(r.k, true), tr = body.insertRow(), name = mk('td');
     name.append(mk('b', f.title), mk('small', (f.eq ? f.eq + ' · ' : '') + topicOf(r.k)));
     tr.appendChild(name);
-    [fmt(r.la) + (f.unit ? ' ' + f.unit : ''), fmt(r.mn), fmt(r.mx), fmt(r.av), `${r.n.toLocaleString('en-US')} นาที · ตั้งแต่ ${dm(r.t0)} ${hm(r.t0)}`].forEach(v => tr.insertCell().textContent = v);
+[fmt(r.la) + (f.unit ? ' ' + f.unit : ''), fmt(r.mn), fmt(r.mx), fmt(r.av)].forEach(v => tr.insertCell().textContent = v); const period = tr.insertCell(); period.append(mk('span', `${r.n.toLocaleString('en-US')} นาที`), mk('small', `เริ่ม ${dm(r.t0)} ${hm(r.t0)}`), mk('small', `ล่าสุด ${dm(r.t1)} ${hm(r.t1)}`));
     const acs = mk('div', null, 'acs');
     const bv = mk('button', '📈 กราฟ'); bv.type = 'button'; bv.onclick = () => logView(r.k);
     const ex = mk('a', '⬇️ CSV', 'btn'); ex.href = `/api/log/export?k=${encodeURIComponent(r.k)}&days=${lspan}`;
