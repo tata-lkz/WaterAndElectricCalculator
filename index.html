@@ -358,7 +358,7 @@ body[data-view=compact] .card .age:not(.old){display:none}
 <dialog id="wdlg"><div class="dh"><div><h2>💧 ค่าน้ำ · วันนี้ใช้ไปเท่าไร</h2><div class="sub">อ่านจากค่ามิเตอร์น้ำสะสม: ใช้ไป = ค่าล่าสุด − ค่าตอนเริ่มวัน (1 หน่วย = 1 ลูกบาศก์เมตร)</div></div>
   <div class="da"><button id="wx" type="button" aria-label="ปิด">✕ ปิด</button></div></div>
   <div class="dbrow"><label for="wk">ค่าน้ำ</label><select id="wk"></select><label for="wu">หน่วยของค่า</label><select id="wu"><option value="m">ลูกบาศก์เมตร (m³)</option><option value="l">ลิตร (L)</option></select>
-    <label for="wr">ช่วง</label><select id="wr"></select><label for="wrate">ราคาต่อหน่วย (บาท)</label><input id="wrate" type="number" min="0" step="0.01" inputmode="decimal"></div>
+    <label for="wr">ช่วง</label><select id="wr"></select><label for="wrate">ราคาต่อ m³ (บาท)</label><input id="wrate" type="number" min="0" step="0.01" inputmode="decimal"></div>
   <div class="whero" id="whero"></div>
   <div class="wt">ค่ามิเตอร์</div><canvas id="wcv"></canvas><div class="stl" id="wsl"></div>
   <div class="wt" id="wbt">ปริมาณน้ำที่ใช้</div><canvas id="wcb"></canvas>
@@ -677,6 +677,24 @@ function drawAxes(g, a) {
   }
   g.font = f0;
 }
+function emptyGraph(g, a) {
+  const { w, h, grid, mute, ink, message, mini = false, R = 10, T = 10, B = 22, span = 0 } = a;
+  if (mini) { g.fillStyle = mute; g.textAlign = 'left'; g.fillText(message, 6, h / 2); return; }
+  const L = 50, pw = Math.max(1, w - L - R), ph = Math.max(1, h - T - B), t1 = Date.now(), t0 = t1 - Math.max(60e3, span || 3600e3);
+  const X = t => L + (t - t0) / (t1 - t0) * pw;
+  drawAxes(g, { w, h, L, R, T, pw, ph, ya: { ticks: [], lab: [] }, t0, t1, X, Y: () => T + ph / 2, mute, ink, grid });
+  g.strokeStyle = grid;
+  for (let i = 1; i < 4; i++) { const y = Math.round(T + ph * i / 4) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); }
+  g.fillStyle = mute; g.textAlign = 'center';
+  const lines = []; let line = '';
+  for (const word of String(message || '').split(/\s+/)) {
+    const next = line ? line + ' ' + word : word;
+    if (line && g.measureText(next).width > pw - 12) { lines.push(line); line = word; } else line = next;
+  }
+  if (line) lines.push(line);
+  const lineH = 16, y = T + ph / 2 - (lines.length - 1) * lineH / 2;
+  lines.forEach((text, i) => g.fillText(text, L + pw / 2, y + i * lineH));
+}
 // แบ่งข้อมูลเป็นช่วงๆ ที่ขาดหายนาน (เช่น อุปกรณ์ออฟไลน์) จะไม่ลากเส้นตรงข้ามช่องว่างให้ดูเหมือนมีข้อมูล
 function segs(pts, span) {
   if (pts.length < 3) return [pts];
@@ -711,7 +729,7 @@ function draw(c) {
   const css = getComputedStyle(document.documentElement), gridC = css.getPropertyValue('--grid'), mute = css.getPropertyValue('--mute'), ink = css.getPropertyValue('--ink'), card = css.getPropertyValue('--card');
   g.font = '12px Sarabun, system-ui, sans-serif'; g.textBaseline = 'middle';
   const mini = view === 'compact' && !!cv.closest('.card'), R = mini ? 6 : 10, T = mini ? 6 : 10, B = mini ? 6 : 22, ph = h - T - B, pts = c.pts;
-  if (!pts.length) { g.fillStyle = mute; g.textAlign = 'left'; g.fillText('ยังไม่มีข้อมูลในช่วงเวลานี้', mini ? 6 : 50, h / 2); return; }
+  if (!pts.length) { const rm = c.rng !== undefined ? c.rng : rangeMs; emptyGraph(g, { w, h, R, T, B, span: rm || histMs, grid: gridC, mute, ink, mini, message: 'ยังไม่มีข้อมูลในช่วงเวลานี้' }); return; }
   let lo = Infinity, hi = -Infinity;
   for (const p of pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
   if (lo === hi) { const d = Math.abs(lo) * .05 || 1; lo -= d; hi += d; } else { const d = (hi - lo) * .08; lo -= d; hi += d; }
@@ -875,9 +893,11 @@ async function logLoad() {
     return;
   }
   $('#loff').hidden = on; $('#lctl').hidden = !on; $('#lflush').hidden = !on;
-  $('#lsub').textContent = on ? `บันทึกรายนาทีอัตโนมัติตลอดเวลา · เก็บย้อนหลัง ${i.days} วัน` + (i.rollup ? ` (เก่ากว่า ${i.rollup} วันย่อเป็นรายชั่วโมง)` : '') + (i.flushMin ? ` · เขียนลงฐานข้อมูลทุก ${i.flushMin} นาที` : ' · เขียนลงฐานข้อมูลทันที')
+  $('#lsub').textContent = on ? `ข้อความ MQTT ดิบเก็บ ${i.rawDays || 30} วัน · สถิติตัวเลขเก็บย้อนหลัง ${i.days} วัน` + (i.rollup ? ` (เก่ากว่า ${i.rollup} วันย่อเป็นรายชั่วโมง)` : '') + (i.flushMin ? ` · สรุปตัวเลขเขียนทุก ${i.flushMin} นาที` : ' · สรุปตัวเลขเขียนทันที')
     + (i.lastOk ? ` · บันทึกล่าสุด ${hm(i.lastOk)}` : '') + (i.pending ? ` · รอเขียน ${i.pending} รายการ` : '') : '';
-  $('#lerr').hidden = !i.lastErr; $('#lerr').textContent = i.lastErr ? '⚠️ บันทึกลงฐานข้อมูลล่าสุดไม่สำเร็จ (ระบบจะลองใหม่เอง): ' + i.lastErr : '';
+  $('#lerr').hidden = !i.lastErr && !i.rawDropped;
+  $('#lerr').textContent = i.lastErr ? '⚠️ บันทึกลงฐานข้อมูลล่าสุดไม่สำเร็จ (ระบบจะลองใหม่เอง): ' + i.lastErr
+    : i.rawDropped ? `⚠️ คิวข้อความ MQTT ดิบเต็มและทิ้งไป ${i.rawDropped} รายการ` : '';
   if (!on) return;
   // ค่าเริ่มต้นแสดงทุกค่า (ค่าที่ระบบรู้จักขึ้นก่อน) ติ๊กช่องด้านบนเพื่อเหลือเฉพาะค่าสำคัญ
   const rows = (j.data || []).slice(), isImp = r => TITLES.has(info(r.k, true).title);
@@ -1095,7 +1115,13 @@ function cCost({ days, ge, se, dg, ds }) {
     note.textContent = 'ประมาณการจากพลังงานสะสม × ราคาที่ตั้ง ยังไม่รวมค่าบริการ/Ft/VAT · เดือนแรกและเดือนนี้เป็นยอดบางส่วน (ดูจำนวนวันที่มีข้อมูล) · ต่อเดือน = เฉลี่ยต่อวัน × 30 · ใช้ได้เมื่อค่าสะสมไม่ถูกรีเซ็ตกลางทาง · เก็บย้อนหลังได้ตาม LOG_DAYS (ปกติ 90 วัน)';
   } else {
     cBar.msg = st.db ? 'เลือกช่วง 7 วัน / 30 วัน / 90 วัน ด้านบน เพื่อดูกราฟค่าไฟรายวันจากข้อมูลที่บันทึกไว้' : 'ต้องตั้ง DATABASE_URL (ฐานข้อมูล) ก่อน จึงจะมีกราฟค่าไฟรายวัน/รายเดือนย้อนหลัง'; cBarDraw();
-    const liveK = c => { if (!c) return null; const a = (series.get(c.id) || []).filter(p => !rangeMs || p[0] >= Date.now() - rangeMs); return a.length > 1 ? { kwh: (a[a.length - 1][1] - a[0][1]) * kwhF(c), ms: a[a.length - 1][0] - a[0][0] } : null; };
+    const liveK = c => {
+      if (!c) return null;
+      const a = (series.get(c.id) || []).filter(p => !rangeMs || p[0] >= Date.now() - rangeMs);
+      if (a.length < 2) return null;
+      const kwh = (a[a.length - 1][1] - a[0][1]) * kwhF(c);
+      return kwh >= 0 ? { kwh, ms: a[a.length - 1][0] - a[0][0] } : null;
+    };
     const g = liveK(ge), s = liveK(se), per = x => x && x.ms >= 600e3 ? x.kwh / x.ms * 864e5 : null;
     if (ge) { tile('ค่าไฟ Grid ในช่วงที่เลือก', g ? kb(g.kwh) + ' บาท' : '–'); tile('ประมาณการต่อวัน', per(g) == null ? '–' : baht(per(g) * r) + ' บาท'); tile('ประมาณการต่อเดือน (30 วัน)', per(g) == null ? '–' : baht(per(g) * 30 * r) + ' บาท'); }
     if (se) { tile('Solar ผลิตในช่วงที่เลือก', s ? kb(s.kwh) + ' บาท' : '–'); tile('Solar ประมาณการต่อวัน', per(s) == null ? '–' : baht(per(s) * r) + ' บาท'); tile('Solar ประมาณการต่อเดือน', per(s) == null ? '–' : baht(per(s) * 30 * r) + ' บาท'); }
@@ -1124,7 +1150,7 @@ function cBarDraw() {
   if (hasS) { const e = mk('span'), i = mk('i'); i.style.background = cs; e.append(i, 'Solar ผลิตได้ (ประหยัดไป)'); lg.appendChild(e); }
   $('#cbt').textContent = mode === 'd' ? 'ใช้ไฟรายวัน' : 'ใช้ไฟรายเดือน';
   const R = 10, T = 12, B = 24, ph = h - T - B, val = v => v == null ? null : unitB ? v * r : v, unit = unitB ? 'บาท' : 'kWh';
-  if (!items.length) { g.fillStyle = k.mute; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(cBar.msg || 'ยังไม่มีข้อมูล', 12, h / 2); sl.textContent = ''; return; }
+  if (!items.length) { emptyGraph(g, { w, h, span: cSpan || histMs, grid: k.grid, mute: k.mute, ink: k.ink, message: cBar.msg || 'ยังไม่มีข้อมูล' }); sl.textContent = ''; return; }
   const ser = [hasG && ['g', cg, 'Grid'], hasS && ['s', cs, 'Solar']].filter(Boolean);
   let mx = 0; for (const it of items) for (const [key] of ser) { const v = val(it[key]); if (v != null && v > mx) mx = v; }
   mx = (mx || 1) * 1.08;
@@ -1168,7 +1194,7 @@ function cDraw() {
   const css = getComputedStyle(document.documentElement), gridC = css.getPropertyValue('--grid'), mute = css.getPropertyValue('--mute'), ink = css.getPropertyValue('--ink'), card = css.getPropertyValue('--card');
   g.font = '12px Sarabun, system-ui, sans-serif'; g.textBaseline = 'middle';
   let L = 50; const R = 10, T = 10, B = 22, ph = h - T - B, live = ser.filter(s => s.pts.length);
-  if (!live.length) { g.fillStyle = mute; g.textAlign = 'left'; g.fillText('ยังไม่มีข้อมูลแรงดันในช่วงเวลานี้', L, h / 2); return; }
+  if (!live.length) { emptyGraph(g, { w, h, span: cSpan || histMs, grid: gridC, mute, ink, message: 'ยังไม่มีข้อมูลแรงดันในช่วงเวลานี้' }); return; }
   let lo = Infinity, hi = -Infinity;
   for (const s of live) for (const p of s.pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
   if (lo === hi) { const d = Math.abs(lo) * .05 || 1; lo -= d; hi += d; } else { const d = (hi - lo) * .1; lo -= d; hi += d; }
@@ -1215,6 +1241,7 @@ function cDraw() {
 let wTok = 0, wSer = [], wBars = [], wSpan = 0, wHx = null, wHb = null, wMsg = '', wTimer = 0;
 let wrate = 15; try { const r = parseFloat(localStorage.getItem('wrate')); if (r >= 0) wrate = r; } catch {}
 const wf = () => $('#wu').value === 'l' ? 1e-3 : 1;
+const wFmt = v => v == null ? '–' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 6 });
 const wDark = () => document.documentElement.dataset.theme === 'dark';
 const wCard = () => cards.get($('#wk').value) || null;
 function wFill() {
@@ -1235,26 +1262,39 @@ function wToday(c) {
   const a = c ? series.get(c.id) || [] : []; if (!a.length) return null;
   const m = new Date(); m.setHours(0, 0, 0, 0);
   let base = null; for (const p of a) { if (p[0] < m.getTime()) base = p; else break; }
-  const after = a.filter(p => p[0] >= m.getTime()); if (!after.length && !base) return null;
-  const b = base || after[0], last = a[a.length - 1], u = (last[1] - b[1]) * wf();
-  return { u, partial: !base, t: last[0], from: b[0] };
+  const after = a.filter(p => p[0] >= m.getTime()), last = a[a.length - 1];
+  if (!after.length) return { reading: last[1] * wf(), u: null, partial: true, t: last[0] };
+  const b = base || after[0], u = (last[1] - b[1]) * wf();
+  return { reading: last[1] * wf(), u, partial: !base, t: last[0] };
 }
 function wHero() {
   const c = wCard(), x = wToday(c), el = $('#whero'), r = Math.max(0, wrate) || 0; el.replaceChildren();
   const tile = (l, v, u) => { const d = mk('div'), b = mk('b', v); b.appendChild(mk('span', u)); d.append(mk('small', l), b); el.appendChild(d); };
   if (!c) { el.appendChild(mk('p', 'ยังไม่พบค่าตัวเลขจากมิเตอร์น้ำ', 'hint')); return; }
   if (!x) { el.appendChild(mk('p', 'วันนี้ยังไม่มีข้อมูลจากมิเตอร์ (รอข้อมูลแรกของวัน)', 'hint')); return; }
-  if (x.u < 0) { el.appendChild(mk('p', 'ค่ามิเตอร์ลดลงจากเมื่อวาน (อาจถูกรีเซ็ตหรือเปลี่ยนมิเตอร์) จึงคิดยอดวันนี้ไม่ได้', 'hint')); return; }
-  tile('วันนี้ใช้ไป', fmt(x.u), 'หน่วย (m³)'); tile('คิดเป็นเงิน', baht(x.u * r), 'บาท');
-  el.appendChild(mk('small', 'ณ ' + hms(x.t) + ' · ราคา ' + baht(r) + ' บาท/หน่วย' + (x.partial ? ' · นับจากข้อมูลแรกของวัน (ไม่มีค่าก่อนเที่ยงคืน)' : '')));
+  tile('ค่ามิเตอร์ล่าสุด', wFmt(x.reading), 'm³');
+  if (x.u == null) {
+    tile('วันนี้ใช้ไป', '–', 'm³'); tile('ค่าใช้จ่ายวันนี้', '–', 'บาท');
+    el.appendChild(mk('small', 'ไม่มีข้อมูลใหม่หลังเที่ยงคืน จึงยังคำนวณยอดวันนี้ไม่ได้ · ราคาตั้งเป็นบาทต่อ m³'));
+    return;
+  }
+  if (x.u < 0) {
+    tile('วันนี้ใช้ไป', '–', 'm³'); tile('ค่าใช้จ่ายวันนี้', '–', 'บาท');
+    el.appendChild(mk('small', 'ค่ามิเตอร์ลดลง (อาจถูกรีเซ็ตหรือเปลี่ยนมิเตอร์) จึงคิดยอดวันนี้ไม่ได้'));
+    return;
+  }
+  tile('วันนี้ใช้ไป', wFmt(x.u), 'm³'); tile('ค่าใช้จ่ายวันนี้', baht(x.u * r), 'บาท');
+  el.appendChild(mk('small', 'ณ ' + hms(x.t) + ' · ราคา ' + baht(r) + ' บาท/m³' + (x.partial ? ' · นับจากข้อมูลแรกของวัน (ไม่มีค่าก่อนเที่ยงคืน)' : '')));
 }
 function wBucket(pts, f, t0, t1) {            // น้ำที่ใช้เป็นรายชั่วโมง (ช่วงยาวมากรวมเป็น 6 ชม.)
   if (pts.length < 2) return [];
   const size = (t1 - t0) > 72 * 3600e3 ? 6 * 3600e3 : 3600e3, long = (t1 - t0) > 36 * 3600e3, out = [];
   let i = 0, last = pts[0][1];
   for (let s = Math.floor(t0 / size) * size; s < t1; s += size) {
-    let v = last; while (i < pts.length && pts[i][0] < s + size) { v = pts[i][1]; i++; }
-    out.push({ label: (long ? dm(s) + ' ' : '') + hm(s), u: Math.max(0, (v - last) * f) }); last = v;
+    let v = last, has = false; while (i < pts.length && pts[i][0] < s + size) { v = pts[i][1]; i++; has = true; }
+    const delta = (v - last) * f;
+    out.push({ label: (long ? dm(s) + ' ' : '') + hm(s), u: has && delta >= 0 ? delta : null });
+    if (has) last = v;
   }
   return out;
 }
@@ -1274,28 +1314,30 @@ async function wLoad() {
     const bd = tb.createTBody(); for (const row of rows) { const tr = bd.insertRow(); if (row.cls) tr.className = row.cls; row.c.forEach(v => tr.insertCell().textContent = v); } return tb; };
   const money = u => u == null ? '–' : baht(u * r);
   if (days && st.db) {
-    const list = dr.map(x => ({ d: x.d, u: x.delta == null ? null : Math.max(0, x.delta * f) })).sort((a, b) => a.d.localeCompare(b.d));
-    wBars = list.map(x => ({ label: x.d.slice(5), u: x.u || 0 }));
-    const full = list.length >= 4 ? list.slice(1, -1) : list, v = full.map(x => x.u).filter(x => x != null), av = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    const resetDays = dr.filter(x => x.delta != null && x.delta < 0).length;
+    const list = dr.map(x => ({ d: x.d, u: x.delta == null || x.delta < 0 ? null : x.delta * f })).sort((a, b) => a.d.localeCompare(b.d));
+    wBars = list.map(x => ({ label: x.d.slice(5), u: x.u }));
+    const today = new Date().toLocaleDateString('sv-SE');
+    const full = list.filter((x, i) => i > 0 && x.d !== today && x.u != null), v = full.map(x => x.u), av = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
     const yd = new Date(Date.now() - 864e5).toLocaleDateString('sv-SE'), y = list.find(x => x.d === yd);
-    tile('เมื่อวานใช้', y && y.u != null ? fmt(y.u) + ' หน่วย · ' + money(y.u) + ' บาท' : '–');
-    tile('เฉลี่ยต่อวัน', av == null ? '–' : fmt(av) + ' หน่วย · ' + money(av) + ' บาท');
-    tile('ประมาณการต่อเดือน (30 วัน)', av == null ? '–' : fmt(av * 30) + ' หน่วย · ' + money(av * 30) + ' บาท');
-    let tu = 0; const body = list.slice().reverse().map(x => { if (x.u != null) tu += x.u; return { c: [x.d, x.u == null ? '–' : fmt(x.u), money(x.u)] }; });
-    if (list.length > 1) body.push({ cls: 'sum', c: ['รวม', fmt(tu), money(tu)] });
-    const mon = new Map(); for (const x of list) { const k = x.d.slice(0, 7), o = mon.get(k) || mon.set(k, { k, n: 0, u: 0 }).get(k); o.n++; o.u += x.u || 0; }
+    tile('เมื่อวานใช้', y && y.u != null ? wFmt(y.u) + ' m³ · ' + money(y.u) + ' บาท' : '–');
+    tile('เฉลี่ยต่อวัน', av == null ? '–' : wFmt(av) + ' m³ · ' + money(av) + ' บาท');
+    tile('ประมาณการต่อเดือน (30 วัน)', av == null ? '–' : wFmt(av * 30) + ' m³ · ' + money(av * 30) + ' บาท');
+    let tu = 0, known = 0; const body = list.slice().reverse().map(x => { if (x.u != null) { tu += x.u; known++; } return { c: [x.d, x.u == null ? '–' : wFmt(x.u), money(x.u)] }; });
+    if (list.length > 1) body.push({ cls: 'sum', c: ['รวม', known ? wFmt(tu) : '–', money(known ? tu : null)] });
+    const mon = new Map(); for (const x of list) { const k = x.d.slice(0, 7), o = mon.get(k) || mon.set(k, { k, n: 0, u: 0, known: 0 }).get(k); o.n++; if (x.u != null) { o.u += x.u; o.known++; } }
     const mn = k => { const [yy, mm] = k.split('-'); try { return new Date(+yy, +mm - 1, 1).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }); } catch { return k; } };
-    $('#wtab').replaceChildren(mk('h3', 'รายเดือน (ตามเดือนปฏิทิน)'), mkT(['เดือน', 'ข้อมูล', 'ใช้ (หน่วย)', 'ค่าน้ำ (บาท)'], [...mon.values()].sort((a, b) => b.k.localeCompare(a.k)).map(o => ({ c: [mn(o.k), o.n + ' วัน', fmt(o.u), money(o.u)] }))),
-      mk('h3', 'รายวัน'), mkT(['วันที่', 'ใช้ (หน่วย)', 'ค่าน้ำ (บาท)'], body));
-    $('#wbt').textContent = 'ปริมาณน้ำที่ใช้ต่อวัน (หน่วย)';
-    $('#wnote').textContent = 'ใช้ = ค่ามิเตอร์ปลายวัน − ปลายวันก่อน · เมื่อวัน/เดือนแรกและวันนี้เป็นยอดบางส่วน · ต่อเดือน = เฉลี่ยต่อวัน × 30 · ราคาคิดแบบเหมาเท่ากันทุกหน่วย (ยังไม่ใช่อัตราก้าวหน้า/ค่าบริการ/VAT)';
+    $('#wtab').replaceChildren(mk('h3', 'รายเดือน (ตามเดือนปฏิทิน)'), mkT(['เดือน', 'ข้อมูล', 'ใช้ (m³)', 'ค่าน้ำ (บาท)'], [...mon.values()].sort((a, b) => b.k.localeCompare(a.k)).map(o => ({ c: [mn(o.k), o.n + ' วัน', wFmt(o.known ? o.u : null), money(o.known ? o.u : null)] }))),
+      mk('h3', 'รายวัน'), mkT(['วันที่', 'ใช้ (m³)', 'ค่าน้ำ (บาท)'], body));
+    $('#wbt').textContent = 'ปริมาณน้ำที่ใช้ต่อวัน (m³)';
+    $('#wnote').textContent = 'ใช้ = ค่ามิเตอร์ปลายวัน − ปลายวันก่อน · ไม่คิดวันแรก/วันนี้ในค่าเฉลี่ย · ต่อเดือน = เฉลี่ยต่อวัน × 30 · ราคาต่อ m³ แบบเหมา (ยังไม่ใช่อัตราก้าวหน้า/ค่าบริการ/VAT)' + (resetDays ? ` · ไม่รวม ${resetDays} วันที่มิเตอร์ลดลง/รีเซ็ต` : '');
   } else {
     const t1 = pts.length ? pts[pts.length - 1][0] : 0, t0 = pts.length ? pts[0][0] : 0;
-    wBars = wBucket(pts, f, t0, t1); $('#wbt').textContent = 'ปริมาณน้ำที่ใช้ต่อชั่วโมง (หน่วย)';
-    const u = pts.length > 1 ? (pts[pts.length - 1][1] - pts[0][1]) * f : null, per = u != null && t1 - t0 >= 600e3 ? u / (t1 - t0) * 864e5 : null;
-    tile('ใช้ในช่วงที่เลือก', u == null ? '–' : fmt(u) + ' หน่วย · ' + money(u) + ' บาท');
-    tile('ประมาณการต่อวัน', per == null ? '–' : fmt(per) + ' หน่วย · ' + money(per) + ' บาท');
-    tile('ประมาณการต่อเดือน (30 วัน)', per == null ? '–' : fmt(per * 30) + ' หน่วย · ' + money(per * 30) + ' บาท');
+    wBars = wBucket(pts, f, t0, t1); $('#wbt').textContent = 'ปริมาณน้ำที่ใช้ต่อชั่วโมง (m³)';
+    const delta = pts.length > 1 ? (pts[pts.length - 1][1] - pts[0][1]) * f : null, u = delta != null && delta >= 0 ? delta : null, per = u != null && t1 - t0 >= 600e3 ? u / (t1 - t0) * 864e5 : null;
+    tile('ใช้ในช่วงที่เลือก', u == null ? '–' : wFmt(u) + ' m³ · ' + money(u) + ' บาท');
+    tile('ประมาณการต่อวัน', per == null ? '–' : wFmt(per) + ' m³ · ' + money(per) + ' บาท');
+    tile('ประมาณการต่อเดือน (30 วัน)', per == null ? '–' : wFmt(per * 30) + ' m³ · ' + money(per * 30) + ' บาท');
     $('#wnote').textContent = (st.db ? 'ข้อมูลสดตามช่วงที่เลือก · เลือกช่วง 7/30 วันเพื่อดูยอดจริงรายวัน/รายเดือน' : 'ยังไม่ได้ตั้ง DATABASE_URL จึงเห็นเฉพาะข้อมูลสด (ตั้งฐานข้อมูลเพื่อดูรายวัน/รายเดือนย้อนหลัง)') + ' · ราคาคิดแบบเหมาเท่ากันทุกหน่วย';
   }
   wPlot();
@@ -1318,7 +1360,7 @@ function wPlot() {
   let k = wCanvas($('#wcv'));
   if (k) {
     const { g, w, h } = k, pts = wSer.map(p => [p[0], p[1] * f]), R = 10, T = 10, B = 22, ph = h - T - B; let L = 56, pw = w - L - R;
-    if (pts.length < 2) { g.fillStyle = k.mute; g.textAlign = 'left'; g.fillText(wMsg || 'ยังไม่มีข้อมูลค่าน้ำในช่วงเวลานี้', L, h / 2); }
+    if (!pts.length) { emptyGraph(g, { w, h, span: wSpan || rangeMs || histMs, grid: k.grid, mute: k.mute, ink: k.ink, message: wMsg || 'ยังไม่มีข้อมูลค่าน้ำในช่วงเวลานี้' }); }
     else {
       let lo = Infinity, hi = -Infinity; for (const p of pts) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
       if (lo === hi) { const d = Math.abs(lo) * .02 || 1; lo -= d; hi += d; } else { const d = (hi - lo) * .1; lo -= d; hi += d; }
@@ -1331,7 +1373,7 @@ function wPlot() {
         let best = pts[0], bd = Infinity; for (const p of pts) { const d = Math.abs(X(p[0]) - wHx); if (d < bd) { bd = d; best = p; } }
         const x = X(best[0]); g.strokeStyle = k.mute; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.setLineDash([]);
         g.fillStyle = col; g.beginPath(); g.arc(x, Y(best[1]), 4.5, 0, 7); g.fill();
-        wTip(k, x, [(long ? dm(best[0]) + ' ' : '') + hms(best[0]), 'มิเตอร์ ' + fmt(best[1]) + ' m³'], T);
+        wTip(k, x, [(long ? dm(best[0]) + ' ' : '') + hms(best[0]), 'มิเตอร์ ' + wFmt(best[1]) + ' m³'], T);
       }
     }
   }
@@ -1339,14 +1381,15 @@ function wPlot() {
   k = wCanvas($('#wcb'));
   if (k) {
     const { g, w, h } = k, b = wBars, L = 56, R = 8, T = 8, B = 20, pw = w - L - R, ph = h - T - B;
-    if (!b.length) { g.fillStyle = k.mute; g.textAlign = 'left'; g.fillText('ยังไม่มีข้อมูลพอจะคำนวณ', L, h / 2); return; }
-    const mx = Math.max(...b.map(x => x.u), 1e-6) * 1.1, Y = v => T + (1 - v / mx) * ph, bw = pw / b.length, dec = mx >= 100 ? 0 : mx >= 10 ? 1 : mx >= 1 ? 2 : 3;
+    const values = b.filter(x => x.u != null);
+    if (!values.length) { emptyGraph(g, { w, h, span: wSpan || rangeMs || histMs, grid: k.grid, mute: k.mute, ink: k.ink, message: 'ยังไม่มีข้อมูลพอจะคำนวณ' }); return; }
+    const mx = Math.max(...values.map(x => x.u), 1e-3) * 1.1, Y = v => T + (1 - v / mx) * ph, bw = pw / b.length;
     g.strokeStyle = k.grid; g.fillStyle = k.mute; g.lineWidth = 1; g.textAlign = 'right';
     { const yt = yTicks(0, mx, 4); for (const v of yt.ticks) { const y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.fillText(yFmt(v, yt.dec), L - 6, y); } }
     const every = Math.max(1, Math.ceil(b.length / 8)); g.textAlign = 'center';
-    b.forEach((x, i) => { const bx = L + i * bw, bh = ph - (Y(x.u) - T); g.fillStyle = col; g.globalAlpha = wHb === i ? 1 : .8; g.fillRect(bx + bw * .15, Y(x.u), Math.max(1, bw * .7), bh); g.globalAlpha = 1;
+    b.forEach((x, i) => { const bx = L + i * bw; if (x.u != null) { const bh = ph - (Y(x.u) - T); g.fillStyle = col; g.globalAlpha = wHb === i ? 1 : .8; g.fillRect(bx + bw * .15, Y(x.u), Math.max(1, bw * .7), bh); g.globalAlpha = 1; }
       if (i % every === 0) { g.fillStyle = k.mute; g.fillText(x.label, bx + bw / 2, h - 8); } });
-    if (wHb != null && b[wHb]) { const x = b[wHb]; wTip(k, L + wHb * bw + bw / 2, [x.label, fmt(x.u) + ' หน่วย', baht(x.u * r) + ' บาท'], T); }
+    if (wHb != null && b[wHb]) { const x = b[wHb]; wTip(k, L + wHb * bw + bw / 2, [x.label, x.u == null ? 'ไม่มีข้อมูลเพียงพอ' : wFmt(x.u) + ' m³ · ' + baht(x.u * r) + ' บาท'], T); }
   }
 }
 {

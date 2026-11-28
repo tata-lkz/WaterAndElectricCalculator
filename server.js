@@ -17,7 +17,7 @@
 //              TG_POLL    ใส่ 0 เพื่อปิดการรับคำสั่ง /report จากแชท
 // เฝ้าระวัง   : (ต้องตั้ง TG_TOKEN + TG_CHAT) แจ้ง Telegram เมื่ออุปกรณ์ไม่ส่งข้อมูล / broker หลุด และแจ้งอีกครั้งเมื่อกลับมา
 //              WATCH_MIN        (5)  อุปกรณ์เงียบเกินกี่นาทีถึงแจ้ง (0 = ปิดการเฝ้าอุปกรณ์ทั้งหมด ยกเว้นที่ตั้งใน WATCH_RULES)
-//              WATCH_RULES      กำหนดเวลาแยกตามชื่อ topic เช่น water=30,demo/data=3,test=0  (ชื่อมีคำนี้ = ใช้เวลานี้, 0 = ไม่เฝ้า)
+//              WATCH_RULES      กำหนดเวลาแยกตามชื่อ topic เช่น water=30,test=0  (ชื่อมีคำนี้ = ใช้เวลานี้, 0 = ไม่เฝ้า)
 //              WATCH_BROKER_S   (60) broker หลุดเกินกี่วินาทีถึงแจ้ง (0 = ปิด)
 //              WATCH_REPEAT_MIN (0)  เตือนซ้ำทุกกี่นาทีถ้ายังไม่กลับมา (0 = แจ้งครั้งเดียว)
 require('dotenv').config();
@@ -26,6 +26,7 @@ const http = require('http'), fs = require('fs'), path = require('path'), crypto
 const mqtt = require('mqtt');
 const { WebSocketServer } = require('ws');
 const datalog = require('./datalog');
+const isDemoTopic = topic => /^demo(?:\/|$)/i.test(topic);
 
 process.on('unhandledRejection', e => console.error('[unhandledRejection]', e && e.message || e));
 
@@ -34,7 +35,7 @@ const CFG = {
   url: process.env.MQTT_URL || '',
   username: process.env.MQTT_USER || '',
   password: process.env.MQTT_PASS || '',
-  topics: (process.env.MQTT_TOPICS || 'Water/Meter/Value,demo/data/#').split(',').map(s => s.trim()).filter(Boolean),
+  topics: (process.env.MQTT_TOPICS || 'Water/Meter/Value').split(',').map(s => s.trim()).filter(Boolean).filter(s => !/^demo(?:\/|$)/i.test(s)),
   port: +process.env.PORT || 3100,
   appPass: process.env.APP_PASS || '',
   histMs: num(process.env.HISTORY_HOURS, 24) * 3600e3,
@@ -89,7 +90,7 @@ const store = new Map();          // topic -> ข้อความล่าส�
 const series = new Map();         // ชื่อค่า -> [[เวลา, ค่า], ...]
 const numericTopics = new Set();  // topic ที่มีค่าตัวเลข (ไว้แยกออกจากข้อความล้วน)
 let state = { connected: false, error: '' };
-const statusMsg = () => ({ kind: 'status', ...state, tg: TG.on, db: datalog.on, dbDays: datalog.DAYS, dbFlushMin: datalog.FLUSH_MIN, dbRollup: datalog.ROLLUP });
+const statusMsg = () => ({ kind: 'status', ...state, tg: TG.on, db: datalog.on, dbDays: datalog.DAYS, dbRawDays: datalog.RAW_DAYS, dbFlushMin: datalog.FLUSH_MIN, dbRollup: datalog.ROLLUP });
 
 // ดึงค่าตัวเลขจาก payload: "12.5", "25.3°C" หรือ JSON {"flow":1.2,"temp":{"in":30}}
 // ชื่อค่า = topic (ตัวเลขล้วน) หรือ "topic › field" (ค่าใน JSON)
@@ -221,7 +222,7 @@ const server = http.createServer((req, res) => {
     if (!datalog.on) return json(res, 200, { ok: false, on: false, data: [], msg: 'ยังไม่ได้เปิดการบันทึกถาวร (ตั้ง DATABASE_URL)' });
     const fail = e => { console.error('[db]', e.message); json(res, 500, { ok: false, msg: 'ฐานข้อมูลผิดพลาด ลองใหม่อีกครั้ง' }); };
     if (u === '/api/log/summary' && req.method === 'GET')
-      return datalog.summary(+q.get('days') || 7).then(data => json(res, 200, { ok: true, on: true, data,
+      return datalog.summary(+q.get('days') || 7).then(data => json(res, 200, { ok: true, on: true, data: data.filter(x => !isDemoTopic(x.k)),
         info: { ...datalog.stat(), days: datalog.DAYS, flushMin: datalog.FLUSH_MIN, now: Date.now() } }), fail);
     if (u === '/api/log/export' && req.method === 'GET') {
       const k = q.get('k') || ''; if (!k || k.length > 400) return json(res, 400, { ok: false, msg: 'ไม่พบชื่อค่า' });
@@ -282,7 +283,10 @@ wss.on('connection', ws => {
 setInterval(() => wss.clients.forEach(c => c.readyState === 1 && c.ping()), 25000);
 
 // ---------- MQTT ----------
-datalog.start(series, CFG.histMs, CFG.histMax, CFG.maxKeys).then(() => { if (datalog.on) bcast(snapshotMsg()); });   // โหลดเสร็จทีหลัง (ลองใหม่ได้) -> ส่งกราฟที่เติมประวัติแล้วให้ทุกหน้าที่เปิดอยู่   // โหลดประวัติจากฐานข้อมูลเข้ากราฟ (ถ้าไม่ตั้ง DATABASE_URL จะไม่ทำอะไร)
+datalog.start(series, CFG.histMs, CFG.histMax, CFG.maxKeys).then(() => {
+  for (const k of series.keys()) if (isDemoTopic(k)) series.delete(k);
+  if (datalog.on) bcast(snapshotMsg());
+});   // โหลดประวัติจากฐานข้อมูลเข้ากราฟ (ถ้าไม่ตั้ง DATABASE_URL จะไม่ทำอะไร)
 const opts = { reconnectPeriod: 3000, connectTimeout: 10000, keepalive: 60, protocolVersion: 4 };
 if (CFG.username) opts.username = CFG.username;
 if (CFG.password) opts.password = CFG.password;
@@ -305,11 +309,14 @@ client.on('connect', () => {
 client.on('error', e => { state.error = e.message; console.error('[mqtt] error', e.message); bcast(statusMsg()); });
 client.on('close', () => { if (state.connected) wdDown(); state.connected = false; bcast(statusMsg()); });
 client.on('message', (topic, buf, packet) => {
+  if (isDemoTopic(topic)) return;
+  const t = Date.now(), payload = buf.toString();
+  datalog.addMessage(topic, buf, t, packet);
   const prev = store.get(topic);
   // retained ที่ broker ส่งซ้ำหลังต่อใหม่ (ค่าเดิมเป๊ะ) ไม่ใช่ข้อมูลใหม่: ไม่บันทึกซ้ำ และไม่ทำให้ป้าย "สด" ขึ้นผิด
-  if (prev && packet && packet.retain && prev.payload === buf.toString()) return;
+  if (prev && packet && packet.retain && prev.payload === payload) return;
   if (!prev && store.size >= CFG.maxKeys) return;   // topic ใหม่เกินเพดาน: ข้าม กันหน่วยความจำโต
-  const m = { topic, payload: buf.toString(), t: Date.now() };
+  const m = { topic, payload, t };
   store.set(topic, m);
   const pts = numbers(topic, m.payload);
   if (pts.length) numericTopics.add(topic);
