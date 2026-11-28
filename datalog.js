@@ -2,11 +2,13 @@
 // ไม่ตั้ง DATABASE_URL = ปิดฟีเจอร์นี้ (ระบบทำงานเหมือนเดิม เก็บแค่ในหน่วยความจำ)
 //   DATABASE_URL    connection string ของ Postgres
 //   LOG_DAYS        เก็บย้อนหลังกี่วัน (90)  เกินแล้วลบอัตโนมัติ
+//   LOG_RAW_DAYS    เก็บข้อความ MQTT ดิบกี่วัน (30) เกินแล้วลบอัตโนมัติ
 //   LOG_FLUSH_MIN   0 (ค่าเริ่มต้น) = บันทึกทันที, มากกว่า 0 = บันทึกเป็นรอบนาที
 //   LOG_ROLLUP_DAYS ข้อมูลเก่ากว่ากี่วันให้ย่อเป็นรายชั่วโมง (7)  ลดขนาดฐานข้อมูลราว 60 เท่า ใส่ 0 = ไม่ย่อ เก็บรายนาทีตลอด
 // เก็บเป็นรายนาที: ค่าเฉลี่ย/ต่ำสุด/สูงสุด/ล่าสุด ของแต่ละค่า (ประมาณ 2-3 MB ต่อวัน ต่อ 15 ค่า)
 const url = process.env.DATABASE_URL || '';
 const DAYS = +process.env.LOG_DAYS > 0 ? +process.env.LOG_DAYS : 90;
+const RAW_DAYS = +process.env.LOG_RAW_DAYS > 0 ? Math.floor(+process.env.LOG_RAW_DAYS) : 30;
 const FLUSH_RAW = process.env.LOG_FLUSH_MIN;
 const FLUSH_MIN = FLUSH_RAW === undefined || FLUSH_RAW === '' ? 0
   : Number.isFinite(+FLUSH_RAW) && +FLUSH_RAW >= 0 ? +FLUSH_RAW : 15;
@@ -28,7 +30,10 @@ function build() {
     ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: VERIFY },
   });
   pool.on('error', e => console.error('[db] pool', e.message));
-  const kids = new Map(), cur = new Map(); let queue = [], schemaOk = false, chain = Promise.resolve(), lastOk = 0, lastErr = '';
+  const kids = new Map(), cur = new Map();
+  const RAW_BATCH = 250, RAW_QUEUE_MAX_ROWS = 50000, RAW_QUEUE_MAX_BYTES = 64 * 1024 * 1024;
+  let queue = [], rawQueue = [], rawQueueBytes = 0, rawQueueRows = 0, rawDropped = 0, lastDropLog = 0;
+  let schemaOk = false, chain = Promise.resolve(), rawChain = Promise.resolve(), lastOk = 0, lastErr = '', rawLastErr = '';
 
   async function schema() {
     if (schemaOk) return;
@@ -45,6 +50,11 @@ function build() {
       v_avg double precision not null, v_min double precision not null, v_max double precision not null, v_last double precision not null,
       v_n int not null default 1, mins int not null default 1, primary key (kid, t))`);
     await pool.query('create index if not exists log_hourly_t on log_hourly(t)');
+    await pool.query(`create table if not exists mqtt_messages(
+      id bigserial primary key, received_at timestamptz not null, topic text not null, payload bytea not null,
+      qos smallint, retain boolean, dup boolean, message_id integer)`);
+    await pool.query('create index if not exists mqtt_messages_received_at on mqtt_messages(received_at)');
+    await pool.query('create index if not exists mqtt_messages_topic_received_at on mqtt_messages(topic, received_at)');
     // มุมมองรวมสองตาราง: ฝั่งอ่านใช้ log_all ตัวเดียว ไม่ต้องรู้ว่าข้อมูลถูกย่อหรือยัง
     await pool.query(`create or replace view log_all as
       select kid, t, v_avg, v_min, v_max, v_last, v_n, 1 as mins from log_readings
@@ -72,6 +82,68 @@ function build() {
     if (FLUSH_MIN === 0 && points.length) flush(true);
   }
   const add = (k, t, v) => addMany([{ k, v }], t);
+
+  function addMessage(topic, payload, t, packet) {
+    if (typeof topic !== 'string') return;
+    const bytes = Buffer.isBuffer(payload) ? Buffer.from(payload) : Buffer.from(String(payload), 'utf8');
+    const row = {
+      receivedAt: Number.isFinite(t) ? new Date(t) : new Date(),
+      topic,
+      payload: bytes,
+      qos: packet && Number.isInteger(packet.qos) ? packet.qos : null,
+      retain: packet && typeof packet.retain === 'boolean' ? packet.retain : null,
+      dup: packet && typeof packet.dup === 'boolean' ? packet.dup : null,
+      messageId: packet && Number.isInteger(packet.messageId) ? packet.messageId : null,
+    };
+    while (rawQueue.length && (rawQueueRows >= RAW_QUEUE_MAX_ROWS || rawQueueBytes + bytes.length > RAW_QUEUE_MAX_BYTES)) {
+      const dropped = rawQueue.shift();
+      rawQueueBytes -= dropped.payload.length;
+      rawQueueRows--;
+      rawDropped++;
+    }
+    if (rawQueueRows >= RAW_QUEUE_MAX_ROWS || rawQueueBytes + bytes.length > RAW_QUEUE_MAX_BYTES) {
+      rawDropped++;
+    } else {
+      rawQueue.push(row);
+      rawQueueBytes += bytes.length;
+      rawQueueRows++;
+    }
+    if (rawDropped && Date.now() - lastDropLog >= 60000) {
+      lastDropLog = Date.now();
+      console.error(`[db] คิว MQTT ดิบเต็ม: ทิ้งข้อความแล้ว ${rawDropped} รายการ`);
+    }
+    if (rawQueue.length >= RAW_BATCH) flushMessages();
+  }
+
+  async function doFlushMessages() {
+    while (rawQueue.length) {
+      await schema();
+      const take = rawQueue.splice(0, RAW_BATCH), params = [], values = [];
+      for (let i = 0; i < take.length; i++) {
+        const n = i * 7;
+        values.push(`($${n + 1}, $${n + 2}, $${n + 3}, $${n + 4}, $${n + 5}, $${n + 6}, $${n + 7})`);
+        const row = take[i];
+        params.push(row.receivedAt, row.topic, row.payload, row.qos, row.retain, row.dup, row.messageId);
+      }
+      try {
+        await pool.query(
+          `insert into mqtt_messages(received_at, topic, payload, qos, retain, dup, message_id) values ${values.join(',')}`,
+          params);
+        rawQueueBytes -= take.reduce((sum, row) => sum + row.payload.length, 0);
+        rawQueueRows -= take.length;
+        rawLastErr = '';
+        lastOk = Date.now();
+        console.log(`[db] บันทึกข้อความ MQTT ${take.length} รายการ`);
+      } catch (e) {
+        rawQueue.unshift(...take);
+        throw e;
+      }
+    }
+  }
+  const flushMessages = () => (rawChain = rawChain.then(doFlushMessages).catch(e => {
+    rawLastErr = e.message;
+    console.error('[db] บันทึกข้อความ MQTT ไม่สำเร็จ (จะลองใหม่):', e.message);
+  }));
 
   async function doFlush(all) {
     const nowMin = Math.floor(Date.now() / 60000) * 60000;
@@ -130,6 +202,7 @@ function build() {
   const rollup = () => (chain = chain.then(doRollup).catch(e => console.error('[db] ย่อข้อมูลเก่าไม่สำเร็จ (จะลองใหม่):', e.message)));   // เข้าคิวเดียวกับการบันทึก/ล้างข้อมูล ไม่ทำพร้อมกัน
   const purge = () => schema().then(async () => {
     for (const t of ['log_readings', 'log_hourly']) await pool.query(`delete from ${t} where t < now() - make_interval(days => $1::int)`, [DAYS]);
+    await pool.query('delete from mqtt_messages where received_at < now() - make_interval(days => $1::int)', [RAW_DAYS]);
   }).catch(e => console.error('[db] ลบข้อมูลเก่า', e.message));
   const maintain = () => purge().then(rollup);
 
@@ -153,8 +226,9 @@ function build() {
   // ฐานข้อมูลฟรี (Neon) อาจกำลังตื่น: ลองใหม่สูงสุด 4 ครั้ง ถ้ายังไม่ได้ก็ทำงานต่อ บันทึกข้อมูลใหม่ได้ตามปกติ
   async function start(series, histMs, histMax, maxKeys = Infinity) {
     setInterval(() => flush(false), FLUSH_MS || 10000);   // โหมดทันที: ตรวจคิวซ้ำทุก 10 วินาทีเมื่อ Neon ขัดข้อง
+    setInterval(flushMessages, 1000);
     setInterval(maintain, 6 * 3600e3);
-    for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { flush(true).finally(() => process.exit(0)); });   // ดีพลอยใหม่/ปิดเครื่อง: บันทึกที่ค้างก่อน
+    for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { Promise.all([flush(true), flushMessages()]).finally(() => process.exit(0)); });   // ดีพลอยใหม่/ปิดเครื่อง: บันทึกที่ค้างก่อน
     for (let i = 1; i <= 4; i++) {
       try { await loadHistory(series, histMs, histMax, maxKeys); break; }
       catch (e) {
@@ -214,22 +288,33 @@ function build() {
   }
   // ล้างข้อมูลย้อนหลัง: k = ชื่อค่าเดียว หรือ null = ทั้งหมด (รอรอบบันทึกที่กำลังทำอยู่ให้จบก่อน กันข้อมูลเก่าถูกเขียนกลับ)
   function reset(k) {
-    const p = chain.then(async () => {
-      if (k) { cur.delete(k); queue = queue.filter(x => x[0] !== k); } else { cur.clear(); queue = []; }
+    const p = Promise.all([chain, rawChain]).then(async () => {
+      if (k) { cur.delete(k); queue = queue.filter(x => x[0] !== k); }
+      else {
+        cur.clear(); queue = [];
+        rawQueue = []; rawQueueBytes = 0; rawQueueRows = 0;
+      }
       await schema();
       if (k) { const id = await kidOf(k, false); if (id) { await pool.query('delete from log_readings where kid = $1', [id]); await pool.query('delete from log_hourly where kid = $1', [id]); } }
-      else await pool.query('truncate table log_readings, log_hourly');
+      else await pool.query('truncate table log_readings, log_hourly, mqtt_messages');
     });
     chain = p.catch(() => {});
+    rawChain = p.catch(() => {});
     return p;
   }
   // บันทึกค่าที่ค้างในหน่วยความจำลงฐานข้อมูลทันที (ถ้าเขียนไม่สำเร็จ จะโยน error กลับไปให้ผู้เรียกรู้ ไม่แกล้งตอบว่าสำเร็จ)
-  const flushNow = async () => { lastErr = ''; await flush(true); if (lastErr) throw new Error(lastErr); };
-  const stat = () => ({ lastOk, lastErr, pending: queue.length + cur.size, rollup: ROLLUP });
-  return { on: true, DAYS, FLUSH_MIN, ROLLUP, add, addMany, start, history, daily, summary, rows, reset, flushNow, stat };
+  const flushNow = async () => {
+    lastErr = ''; rawLastErr = '';
+    await Promise.all([flush(true), flushMessages()]);
+    if (lastErr || rawLastErr) throw new Error([lastErr, rawLastErr].filter(Boolean).join('; '));
+  };
+  const stat = () => ({ lastOk, lastErr: lastErr || rawLastErr,
+    pending: queue.length + cur.size + rawQueueRows, rollup: ROLLUP,
+    rawPending: rawQueueRows, rawDropped, rawLastErr, rawDays: RAW_DAYS });
+  return { on: true, DAYS, RAW_DAYS, FLUSH_MIN, ROLLUP, add, addMany, addMessage, start, history, daily, summary, rows, reset, flushNow, stat };
 }
 
 module.exports = url ? build() : {
-  on: false, DAYS, FLUSH_MIN, ROLLUP, add() {}, addMany() {}, async start() {}, async history() { return []; }, async daily() { return []; },
-  async summary() { return []; }, async rows() { return []; }, async reset() {}, async flushNow() {}, stat() { return { lastOk: 0, lastErr: '', pending: 0, rollup: ROLLUP }; },
+  on: false, DAYS, RAW_DAYS, FLUSH_MIN, ROLLUP, add() {}, addMany() {}, addMessage() {}, async start() {}, async history() { return []; }, async daily() { return []; },
+  async summary() { return []; }, async rows() { return []; }, async reset() {}, async flushNow() {},   stat() { return { lastOk: 0, lastErr: '', pending: 0, rollup: ROLLUP, rawPending: 0, rawDropped: 0, rawLastErr: '', rawDays: RAW_DAYS }; },
 };
